@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b3a676ccd67b0614db354899b4871389, type: 3}
+  m_Name: MapGenerationProfile_Spring
+  m_EditorClassIdentifier: Assembly-CSharp::Railgame.Map.MapGenerationProfile
+  groundChunkPrefab: {fileID: 2633765737978802846, guid: 1cdedbf45b8e08b4785a02394f1aaea9, type: 3}
+  groundCellPrefab: {fileID: 5572461889656462251, guid: bd13fe2a3c39638408b45920c934988c, type: 3}
+  dirtPrefab: {fileID: 8626841007931108869, guid: 3ec1360d76116ff4985912442e13a80a, type: 3}
+  waterPrefab: {fileID: 4411363752438155964, guid: 36d05fe8041c1ef4aa57950f9a27c68a, type: 3}
+  boundaryPrefab: {fileID: 3196043692854484447, guid: a933761961b246e4089aabfe895b3be9, type: 3}
+  backgroundMountainPrefab: {fileID: 8626841007931108869, guid: 3ec1360d76116ff4985912442e13a80a, type: 3}
+  treePrefab: {fileID: 7803733390791434323, guid: e1214c60dd664984f9e353e3381a74f4, type: 3}
+  ironPrefab: {fileID: 4616430238710469055, guid: 52d019fe809e5ac4bb7493afe3aea02b, type: 3}
+  railPrefab: {fileID: 0}
+  enemyPrefab: {fileID: 0}
+  treeCount: 12
+  ironCount: 12
+  waterCellCount: 12
+  hillResourceChance: 0.35
