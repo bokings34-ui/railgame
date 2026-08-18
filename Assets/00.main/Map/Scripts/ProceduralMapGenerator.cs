@@ -497,6 +497,7 @@ namespace Railgame.Map
             generatedRoot = new GameObject("GeneratedMap").transform;
             generatedRoot.SetParent(transform, false);
 
+            Transform safetyFloorRoot = CreateGroup("SafetyFloor_NoSpawns");
             Transform groundRoot = CreateGroup("Ground");
             Transform waterRoot = CreateGroup("Water");
             Transform dirtRoot = CreateGroup("DirtHills_1m");
@@ -505,12 +506,28 @@ namespace Railgame.Map
             Transform boundaryRoot = CreateGroup("TransparentBoundaries");
             Transform mountainRoot = CreateGroup("BackgroundMountains_2to6m");
 
+            BuildSafetyFloor(safetyFloorRoot);
             BuildGround(groundRoot);
             BuildWater(waterRoot, linkRoot);
             BuildDirt(dirtRoot, linkRoot);
             BuildResources(resourceRoot);
             BuildBoundaries(boundaryRoot);
             BuildMountains(random, mountainRoot);
+        }
+
+        private void BuildSafetyFloor(Transform parent)
+        {
+            Material bottomMaterial = profile.DirtPrefab.GetComponentInChildren<Renderer>(true)?.sharedMaterial;
+            for (int chunkX = 0; chunkX < TotalWidth / 8; chunkX++)
+            for (int chunkZ = 0; chunkZ < MapLength / 8; chunkZ++)
+            {
+                GameObject chunk = PlacePrefab(profile.GroundChunkPrefab, parent,
+                    new Vector3(chunkX * 8, -1f, chunkZ * 8), $"SafetyFloor_{chunkX}_{chunkZ}");
+                if (bottomMaterial == null)
+                    continue;
+                foreach (Renderer renderer in chunk.GetComponentsInChildren<Renderer>(true))
+                    renderer.sharedMaterial = bottomMaterial;
+            }
         }
 
         private void BuildGround(Transform parent)
@@ -551,6 +568,9 @@ namespace Railgame.Map
                     continue;
                 Vector2Int cell = new(x, z);
                 GameObject water = PlacePrefab(profile.WaterPrefab, parent, new Vector3(x, 0f, z), $"Water_{x}_{z}");
+                Transform basinFloor = water.transform.Find("BasinFloor");
+                if (basinFloor != null)
+                    basinFloor.gameObject.SetActive(false);
                 Transform visual = water.transform.Find("WaterVisual");
                 if (visual != null)
                     SetLayerRecursively(visual.gameObject, 8);

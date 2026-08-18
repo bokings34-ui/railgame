@@ -120,6 +120,15 @@ namespace Railgame.Editor
             Require(generator.HasRailPathAfterMining(), "Flat rail route after mining is incomplete");
             Require(navigation.Surface.navMeshData != null, "NavMesh data was not built");
 
+            Transform safetyFloor = generator.transform.Find("GeneratedMap/SafetyFloor_NoSpawns");
+            Require(safetyFloor != null && safetyFloor.childCount == 48, "Continuous lower safety floor is incomplete");
+            Require(safetyFloor.GetComponentsInChildren<ResourceSpawnSlot>(true).Length == 0 &&
+                    safetyFloor.GetComponentsInChildren<DirtBlock>(true).Length == 0,
+                "Gameplay content spawned on lower safety floor");
+            int disabledWaterBasins = generator.GetComponentsInChildren<Transform>(true)
+                .Count(item => item.name == "BasinFloor" && !item.gameObject.activeSelf);
+            Require(disabledWaterBasins == generator.GeneratedWaterCount, "Water prefab basin floors overlap the continuous safety floor");
+
             Vector3 start = generator.transform.TransformPoint(new Vector3(11.5f, 1f, 2.5f));
             Vector3 goal = generator.transform.TransformPoint(new Vector3(11.5f, 1f, 125.5f));
             Require(NavMesh.SamplePosition(start, out NavMeshHit startHit, 2f, NavMesh.AllAreas), "NavMesh start missing");
