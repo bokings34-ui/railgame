@@ -38,6 +38,7 @@ namespace Railgame.Editor
             EnsureFolder(ProfileFolder);
             EnsureFolder(TextureFolder);
             EnsureFolder(PlayerPrefabFolder);
+            RailgameCasualFoundationBuilder.BuildSharedAssets();
             CreateVoxelTextures();
             ConfigureCharacterTextures();
             GameObject groundCell = CreateGroundCellPrefab();
@@ -61,6 +62,7 @@ namespace Railgame.Editor
             AssetDatabase.SaveAssets();
             string springHash = BuildSeasonScene(SpringScenePath, SpringProfilePath, 20260818, "Spring");
             string summerHash = BuildSeasonScene(SummerScenePath, SummerProfilePath, 20260819, "Summer");
+            RailgameCasualFoundationBuilder.BuildLobbyScene();
             AddScenesToBuildSettings();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -79,7 +81,7 @@ namespace Railgame.Editor
             surface.agentTypeID = 0;
             surface.collectObjects = CollectObjects.Volume;
             surface.center = new Vector3(12f, 1.5f, 64f);
-            surface.size = new Vector3(20f, 5f, 128f);
+            surface.size = new Vector3(24f, 5f, 128f);
             surface.layerMask = (1 << 0) | (1 << 4);
             surface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
             surface.ignoreNavMeshAgent = true;
@@ -115,6 +117,7 @@ namespace Railgame.Editor
 
             BuildMarkers(root.transform);
             BuildLightingAndCamera(player.transform);
+            RailgameCasualFoundationBuilder.AddGameplayFoundation(root.transform, player.transform, enemies.transform, navigation);
             generator.GenerateNow();
             generatorData.Update();
             generatorData.FindProperty("buildNavMeshAfterGenerate").boolValue = true;
@@ -629,10 +632,12 @@ namespace Railgame.Editor
         {
             List<EditorBuildSettingsScene> scenes = EditorBuildSettings.scenes
                 .Where(item => !string.Equals(item.path, SpringScenePath, StringComparison.OrdinalIgnoreCase) &&
-                               !string.Equals(item.path, SummerScenePath, StringComparison.OrdinalIgnoreCase))
+                               !string.Equals(item.path, SummerScenePath, StringComparison.OrdinalIgnoreCase) &&
+                               !string.Equals(item.path, RailgameCasualFoundationBuilder.LobbyScenePath, StringComparison.OrdinalIgnoreCase))
                 .ToList();
             scenes.Insert(0, new EditorBuildSettingsScene(SummerScenePath, true));
             scenes.Insert(0, new EditorBuildSettingsScene(SpringScenePath, true));
+            scenes.Insert(0, new EditorBuildSettingsScene(RailgameCasualFoundationBuilder.LobbyScenePath, true));
             EditorBuildSettings.scenes = scenes.ToArray();
         }
 

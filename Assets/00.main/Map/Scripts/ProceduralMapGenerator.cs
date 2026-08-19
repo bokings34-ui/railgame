@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Railgame.Enemy;
 using Unity.AI.Navigation;
 using UnityEngine;
 using UnityEngine.AI;
@@ -42,6 +43,7 @@ namespace Railgame.Map
         public int GeneratedRiverCount { get; private set; }
         public int GeneratedMountainCount { get; private set; }
         public int GeneratedJumpLinkCount { get; private set; }
+        public int GeneratedEnemySpawnMarkerCount { get; private set; }
         public int WorldSeed => worldSeed;
         public MapGenerationProfile Profile => profile;
 
@@ -137,6 +139,7 @@ namespace Railgame.Map
             GeneratedRiverCount = 0;
             GeneratedMountainCount = 0;
             GeneratedJumpLinkCount = 0;
+            GeneratedEnemySpawnMarkerCount = 0;
         }
 
         private void GenerateRoute(Random random)
@@ -515,6 +518,7 @@ namespace Railgame.Map
             Transform resourceRoot = CreateGroup("TeamResourceSlots");
             Transform linkRoot = CreateGroup("TraversalLinks");
             Transform boundaryRoot = CreateGroup("TransparentBoundaries");
+            Transform enemySpawnRoot = CreateGroup("EnemySpawnMarkers");
             Transform mountainRoot = CreateGroup("BackgroundMountains_2to6m");
 
             BuildSafetyFloor(safetyFloorRoot);
@@ -523,6 +527,7 @@ namespace Railgame.Map
             BuildDirt(dirtRoot, linkRoot);
             BuildResources(resourceRoot);
             BuildBoundaries(boundaryRoot);
+            BuildEnemySpawnMarkers(enemySpawnRoot);
             BuildMountains(random, mountainRoot);
         }
 
@@ -679,6 +684,54 @@ namespace Railgame.Map
                 SetLayerRecursively(left, 6);
                 SetLayerRecursively(right, 6);
             }
+        }
+
+        private void BuildEnemySpawnMarkers(Transform parent)
+        {
+            for (int leg = 0; leg < MapLength / LegLength; leg++)
+            {
+                CreateEnemySpawnMarker(parent, leg, true, FindEnemyEntryRow(leg, true));
+                CreateEnemySpawnMarker(parent, leg, false, FindEnemyEntryRow(leg, false));
+            }
+        }
+
+        private int FindEnemyEntryRow(int leg, bool left)
+        {
+            int start = leg * LegLength + 4;
+            int end = (leg + 1) * LegLength - 4;
+            for (int z = start; z < end; z++)
+            {
+                int minX = left ? PlayableMinX : PlayableMaxX - 2;
+                bool clear = true;
+                for (int x = minX; x < minX + 3; x++)
+                {
+                    Cell state = cells[x, z];
+                    clear &= !state.Water && !state.Dirt && !state.Resource;
+                }
+
+                if (clear)
+                    return z;
+            }
+
+            throw new InvalidOperationException($"No clear enemy entry row for leg {leg} side {(left ? "left" : "right")}.");
+        }
+
+        private void CreateEnemySpawnMarker(Transform parent, int leg, bool left, int z)
+        {
+            GameObject markerObject = new($"EnemySpawn_Leg{leg}_{(left ? "Left" : "Right")}");
+            markerObject.transform.SetParent(parent, false);
+
+            Transform spawn = new GameObject("SpawnPoint_OutsideWall").transform;
+            spawn.SetParent(markerObject.transform, false);
+            spawn.localPosition = new Vector3(left ? 0.75f : 23.25f, 1f, z + 0.5f);
+
+            Transform entry = new GameObject("EntryPoint_InsideWall").transform;
+            entry.SetParent(markerObject.transform, false);
+            entry.localPosition = new Vector3(left ? 3.5f : 20.5f, 1f, z + 0.5f);
+
+            EnemySpawnMarker marker = markerObject.AddComponent<EnemySpawnMarker>();
+            marker.Initialize(spawn, entry, leg, left);
+            GeneratedEnemySpawnMarkerCount++;
         }
 
         private void BuildMountains(Random random, Transform parent)
