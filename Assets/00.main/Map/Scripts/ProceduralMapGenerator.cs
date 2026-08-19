@@ -120,6 +120,8 @@ namespace Railgame.Map
             if (profile.GroundChunkPrefab == null || profile.GroundCellPrefab == null || profile.DirtPrefab == null ||
                 profile.WaterPrefab == null || profile.BoundaryPrefab == null)
                 throw new MissingReferenceException("MapGenerationProfile core map prefabs are incomplete.");
+            if (profile.RiverBendMax < profile.RiverBendMin)
+                throw new InvalidOperationException("River bend range is invalid.");
         }
 
         private void ResetState()
@@ -182,25 +184,27 @@ namespace Railgame.Map
         private void GenerateRiver(Random random, int centerZ, byte riverId)
         {
             int z = centerZ;
-            int nextBend = random.Next(2, 5);
+            int nextBend = random.Next(profile.RiverBendMin, profile.RiverBendMax + 1);
             for (int x = PlayableMinX; x <= PlayableMaxX; x++)
             {
                 if (--nextBend == 0)
                 {
                     z = Mathf.Clamp(z + random.Next(-1, 2), 8, MapLength - 10);
-                    nextBend = random.Next(2, 5);
+                    nextBend = random.Next(profile.RiverBendMin, profile.RiverBendMax + 1);
                 }
-                MarkRiverCell(x, z, riverId);
-                MarkRiverCell(x, z + 1, riverId);
-                MarkRiverCell(x, z + 2, riverId);
+                for (int width = 0; width < profile.RiverWidth; width++)
+                    MarkRiverCell(x, z + width, riverId);
             }
             GeneratedRiverCount++;
         }
 
         private void MarkRiverCell(int x, int z, byte riverId)
         {
-            if (cells[x, z].Route || (x > PlayableMinX && cells[x - 1, z].Route) ||
-                (x < PlayableMaxX && cells[x + 1, z].Route))
+            int extraFordWidth = (profile.FordWidth - 3) / 2;
+            bool crossingCell = false;
+            for (int offset = -extraFordWidth; offset <= extraFordWidth && !crossingCell; offset++)
+                crossingCell = x + offset >= PlayableMinX && x + offset <= PlayableMaxX && cells[x + offset, z].Route;
+            if (crossingCell)
             {
                 Cell crossing = cells[x, z];
                 crossing.Crossing = true;
@@ -249,7 +253,7 @@ namespace Railgame.Map
         {
             for (int leg = 0; leg < MapLength / LegLength; leg++)
             {
-                int target = 8 + leg * 4;
+                int target = profile.DirtBaseCount + leg * profile.DirtIncreasePerLeg;
                 int placed = 0;
                 for (int plateau = 0; plateau < 2; plateau++)
                 {
@@ -334,7 +338,7 @@ namespace Railgame.Map
             for (int cluster = 0; cluster < clusterCount; cluster++)
             {
                 int clusterTarget = target / clusterCount + (cluster < target % clusterCount ? 1 : 0);
-                Vector2Int center = new(random.Next(PlayableMinX + 1, PlayableMaxX), leg * LegLength + 7 + cluster * 9);
+                Vector2Int center = new(ResourceClusterX(random), leg * LegLength + 7 + cluster * 9);
                 int clusterPlaced = 0;
                 while (clusterPlaced < clusterTarget)
                 {
@@ -367,6 +371,13 @@ namespace Railgame.Map
             }
             if (placed != target)
                 throw new InvalidOperationException($"Wrong {(tree ? "tree" : "iron")} count in leg {leg}.");
+        }
+
+        private int ResourceClusterX(Random random)
+        {
+            if (random.NextDouble() >= profile.ResourceSideBias)
+                return random.Next(PlayableMinX + 1, PlayableMaxX);
+            return random.Next(0, 2) == 0 ? random.Next(PlayableMinX + 1, 8) : random.Next(16, PlayableMaxX);
         }
 
         private bool TryFindNearestResource(Random random, int leg, Vector2Int center, Vector2Int footprint, bool hillOnly,
@@ -517,7 +528,9 @@ namespace Railgame.Map
 
         private void BuildSafetyFloor(Transform parent)
         {
-            Material bottomMaterial = profile.DirtPrefab.GetComponentInChildren<Renderer>(true)?.sharedMaterial;
+            Material bottomMaterial = profile.DirtMaterial != null
+                ? profile.DirtMaterial
+                : profile.DirtPrefab.GetComponentInChildren<Renderer>(true)?.sharedMaterial;
             for (int chunkX = 0; chunkX < TotalWidth / 8; chunkX++)
             for (int chunkZ = 0; chunkZ < MapLength / 8; chunkZ++)
             {
@@ -544,7 +557,8 @@ namespace Railgame.Map
                 Vector2Int chunk = new(chunkX, chunkZ);
                 if (!waterChunks.Contains(chunk))
                 {
-                    PlacePrefab(profile.GroundChunkPrefab, parent, new Vector3(chunkX * 8, 0f, chunkZ * 8), $"GroundChunk_{chunkX}_{chunkZ}");
+                    GameObject ground = PlacePrefab(profile.GroundChunkPrefab, parent, new Vector3(chunkX * 8, 0f, chunkZ * 8), $"GroundChunk_{chunkX}_{chunkZ}");
+                    ApplyMaterial(ground, profile.GroundMaterial);
                     continue;
                 }
 
@@ -554,7 +568,10 @@ namespace Railgame.Map
                     int x = chunkX * 8 + localX;
                     int z = chunkZ * 8 + localZ;
                     if (!cells[x, z].Water)
-                        PlacePrefab(profile.GroundCellPrefab, parent, new Vector3(x, 0f, z), $"GroundCell_{x}_{z}");
+                    {
+                        GameObject ground = PlacePrefab(profile.GroundCellPrefab, parent, new Vector3(x, 0f, z), $"GroundCell_{x}_{z}");
+                        ApplyMaterial(ground, profile.GroundMaterial);
+                    }
                 }
             }
         }
@@ -573,7 +590,10 @@ namespace Railgame.Map
                     basinFloor.gameObject.SetActive(false);
                 Transform visual = water.transform.Find("WaterVisual");
                 if (visual != null)
+                {
                     SetLayerRecursively(visual.gameObject, 8);
+                    ApplyMaterial(visual.gameObject, profile.WaterMaterial);
+                }
 
                 foreach (Vector2Int direction in Directions)
                 {
@@ -594,6 +614,7 @@ namespace Railgame.Map
 
                 Vector2Int cell = new(x, z);
                 GameObject instance = PlacePrefab(profile.DirtPrefab, parent, new Vector3(x, 1f, z), $"Dirt_{x}_{z}_H1");
+                ApplyMaterial(instance, profile.DirtMaterial);
                 DirtBlock block = instance.GetComponent<DirtBlock>() ?? instance.AddComponent<DirtBlock>();
                 block.Initialize(this, cell);
                 dirtBlocks[cell] = block;
@@ -631,6 +652,10 @@ namespace Railgame.Map
                     visual.transform.localPosition = Vector3.zero;
                     visual.transform.localRotation = Quaternion.identity;
                     SetLayerRecursively(visual, 7);
+                    if (state.Tree && profile.LeavesMaterial != null)
+                        foreach (Renderer renderer in visual.GetComponentsInChildren<Renderer>(true))
+                            if (renderer.name.Contains("Leaves", StringComparison.OrdinalIgnoreCase))
+                                renderer.sharedMaterial = profile.LeavesMaterial;
                 }
 
                 NavMeshObstacle obstacle = slot.AddComponent<NavMeshObstacle>();
@@ -673,7 +698,10 @@ namespace Railgame.Map
         private void BuildMountainColumn(Transform parent, float x, int z, int height, string name)
         {
             GameObject item = PlacePrefab(profile.BackgroundMountainPrefab, parent, new Vector3(x, 1f, z), name);
+            ApplyMaterial(item, profile.DirtMaterial);
             item.transform.localScale = new Vector3(4f, height, 4f);
+            foreach (Renderer renderer in item.GetComponentsInChildren<Renderer>(true))
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             SetLayerRecursively(item, 8);
             GeneratedMountainCount++;
         }
@@ -753,6 +781,14 @@ namespace Railgame.Map
             instance.transform.localRotation = Quaternion.identity;
             instance.transform.localScale = Vector3.one;
             return instance;
+        }
+
+        private static void ApplyMaterial(GameObject root, Material material)
+        {
+            if (material == null)
+                return;
+            foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
+                renderer.sharedMaterial = material;
         }
 
         private void ClearGenerated()

@@ -23,7 +23,8 @@ namespace Railgame.Editor
         private const string SceneFolder = MapFolder + "/Scenes";
         private const string SpringProfilePath = ProfileFolder + "/MapGenerationProfile_Spring.asset";
         private const string SummerProfilePath = ProfileFolder + "/MapGenerationProfile_Summer.asset";
-        private const string ScenePath = SceneFolder + "/Map_Procedural_Spring.unity";
+        private const string SpringScenePath = SceneFolder + "/Map_Procedural_Spring.unity";
+        private const string SummerScenePath = SceneFolder + "/Map_Procedural_Summer.unity";
 
         [MenuItem("Railgame/Build Procedural Map")]
         public static void Build()
@@ -31,11 +32,35 @@ namespace Railgame.Editor
             EnsureFolder(ProfileFolder);
             GameObject groundCell = CreateGroundCellPrefab();
             GameObject boundary = CreateBoundaryPrefab();
-            MapGenerationProfile spring = CreateProfile(SpringProfilePath, groundCell, boundary, 0.35f);
-            CreateProfile(SummerProfilePath, groundCell, boundary, 0.25f);
+            Material springGrass = CreateSeasonMaterial("M_Spring_Grass", "M_Grass.mat", new Color32(0x93, 0xC9, 0x5A, 0xFF));
+            Material springDirt = CreateSeasonMaterial("M_Spring_Dirt", "M_Dirt.mat", new Color32(0xA6, 0x68, 0x3F, 0xFF));
+            Material springLeaves = CreateSeasonMaterial("M_Spring_Leaves", "M_Leaves.mat", new Color32(0x7A, 0xC3, 0x4A, 0xFF));
+            Material springWater = CreateSeasonMaterial("M_Spring_Water", "M_Water.mat", new Color32(0x45, 0xBC, 0xE1, 0x9E));
+            Material summerGrass = CreateSeasonMaterial("M_Summer_Grass", "M_Grass.mat", new Color32(0x6D, 0xAA, 0x3E, 0xFF));
+            Material summerDirt = CreateSeasonMaterial("M_Summer_Dirt", "M_Dirt.mat", new Color32(0x87, 0x51, 0x2E, 0xFF));
+            Material summerLeaves = CreateSeasonMaterial("M_Summer_Leaves", "M_Leaves.mat", new Color32(0x43, 0x8A, 0x38, 0xFF));
+            Material summerWater = CreateSeasonMaterial("M_Summer_Water", "M_Water.mat", new Color32(0x24, 0x8E, 0xC8, 0x9E));
 
+            CreateProfile(SpringProfilePath, groundCell, boundary,
+                springGrass, springDirt, springWater, springLeaves, 0.25f, 2, 3, 5, 5, 8, 2, 0.25f);
+            CreateProfile(SummerProfilePath, groundCell, boundary,
+                summerGrass, summerDirt, summerWater, summerLeaves, 0.40f, 3, 2, 4, 3, 12, 4, 0.65f);
+
+            AssetDatabase.SaveAssets();
+            string springHash = BuildSeasonScene(SpringScenePath, SpringProfilePath, 20260818, "Spring");
+            string summerHash = BuildSeasonScene(SummerScenePath, SummerProfilePath, 20260819, "Summer");
+            AddScenesToBuildSettings();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log($"RAILGAME_SEASON_MAPS_BUILD_OK spring={springHash} summer={summerHash}");
+        }
+
+        private static string BuildSeasonScene(string scenePath, string profilePath, int seed, string season)
+        {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            GameObject root = new("ProceduralMapRoot_24x128");
+            MapGenerationProfile profile = AssetDatabase.LoadAssetAtPath<MapGenerationProfile>(profilePath);
+            Require(profile != null, $"{season} profile missing");
+            GameObject root = new($"ProceduralMapRoot_24x128_{season}");
             root.transform.position = new Vector3(-12f, 0f, 0f);
 
             NavMeshSurface surface = root.AddComponent<NavMeshSurface>();
@@ -62,9 +87,9 @@ namespace Railgame.Editor
 
             ProceduralMapGenerator generator = root.AddComponent<ProceduralMapGenerator>();
             SerializedObject generatorData = new(generator);
-            generatorData.FindProperty("profile").objectReferenceValue = spring;
+            generatorData.FindProperty("profile").objectReferenceValue = profile;
             generatorData.FindProperty("navigation").objectReferenceValue = navigation;
-            generatorData.FindProperty("worldSeed").intValue = 20260818;
+            generatorData.FindProperty("worldSeed").intValue = seed;
             generatorData.FindProperty("generateOnStart").boolValue = true;
             generatorData.FindProperty("buildNavMeshAfterGenerate").boolValue = false;
             generatorData.ApplyModifiedPropertiesWithoutUndo();
@@ -79,22 +104,34 @@ namespace Railgame.Editor
             surface.navMeshData = null;
 
             EditorSceneManager.MarkSceneDirty(scene);
-            if (!EditorSceneManager.SaveScene(scene, ScenePath))
-                throw new InvalidOperationException("Failed to save procedural map scene.");
-
-            AddSceneToBuildSettings();
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            Debug.Log($"RAILGAME_PROCEDURAL_BUILD_OK scene={ScenePath} seed={generator.WorldSeed} hash={generator.LastLayoutHash}");
+            if (!EditorSceneManager.SaveScene(scene, scenePath))
+                throw new InvalidOperationException($"Failed to save {season} procedural map scene.");
+            Debug.Log($"RAILGAME_PROCEDURAL_BUILD_OK season={season} scene={scenePath} seed={generator.WorldSeed} hash={generator.LastLayoutHash}");
+            return generator.LastLayoutHash;
         }
 
         [MenuItem("Railgame/Validate Procedural Map")]
         public static void Validate()
         {
-            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null)
-                throw new FileNotFoundException("Procedural map scene missing.", ScenePath);
+            MapGenerationProfile spring = AssetDatabase.LoadAssetAtPath<MapGenerationProfile>(SpringProfilePath);
+            MapGenerationProfile summer = AssetDatabase.LoadAssetAtPath<MapGenerationProfile>(SummerProfilePath);
+            Require(spring != null && spring.RiverWidth == 2 && spring.FordWidth == 5 && spring.DirtBaseCount == 8,
+                "Spring profile settings mismatch");
+            Require(summer != null && summer.RiverWidth == 3 && summer.FordWidth == 3 && summer.DirtBaseCount == 12,
+                "Summer profile settings mismatch");
+            Require(spring.GroundMaterial != summer.GroundMaterial && spring.WaterMaterial != summer.WaterMaterial,
+                "Season material profiles are not distinct");
+            ValidateScene(SpringScenePath, "Spring");
+            ValidateScene(SummerScenePath, "Summer");
+            Debug.Log("RAILGAME_SEASON_MAPS_VALIDATE_OK seasons=2");
+        }
 
-            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        private static void ValidateScene(string scenePath, string season)
+        {
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath) == null)
+                throw new FileNotFoundException($"{season} procedural map scene missing.", scenePath);
+
+            EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
             ProceduralMapGenerator generator = Object.FindFirstObjectByType<ProceduralMapGenerator>();
             RuntimeNavigationController navigation = Object.FindFirstObjectByType<RuntimeNavigationController>();
             Require(generator != null, "ProceduralMapGenerator missing");
@@ -110,7 +147,12 @@ namespace Railgame.Editor
             Require(generator.GeneratedWaterCount >= generator.Profile.WaterCellCount * legCount, "Water guarantee failed");
             Require(generator.GeneratedTreeCount >= generator.Profile.TreeCount * legCount, "Tree slot guarantee failed");
             Require(generator.GeneratedIronCount >= generator.Profile.IronCount * legCount, "Iron slot guarantee failed");
-            Require(generator.GeneratedDirtCount >= 32, "Dirt hill count too low");
+            int expectedDirt = generator.Profile.DirtBaseCount * legCount +
+                               generator.Profile.DirtIncreasePerLeg * legCount * (legCount - 1) / 2;
+            Require(generator.GeneratedDirtCount == expectedDirt, "Dirt progression count mismatch");
+            Require(generator.Profile.GroundMaterial != null && generator.Profile.DirtMaterial != null &&
+                    generator.Profile.WaterMaterial != null && generator.Profile.LeavesMaterial != null,
+                "Season materials are not fully wired");
             Require(generator.GeneratedHillResourceCount > 0, "No resource generated on a 1m hill");
             Require(generator.GeneratedRiverCount == 2, "Transverse river count mismatch");
             Require(generator.GeneratedResourceClusterCount == legCount * 6, "Resource cluster count mismatch");
@@ -145,7 +187,7 @@ namespace Railgame.Editor
             Require(LayerMask.NameToLayer("ResourceObstacle") == 7, "ResourceObstacle layer missing");
             Require(LayerMask.NameToLayer("BackgroundTerrain") == 8, "BackgroundTerrain layer missing");
 
-            Debug.Log($"RAILGAME_PROCEDURAL_MAP_OK seed={generator.WorldSeed} hash={generator.LastLayoutHash} water={generator.GeneratedWaterCount} dirt={generator.GeneratedDirtCount} tree={generator.GeneratedTreeCount} iron={generator.GeneratedIronCount} resourceClusters={generator.GeneratedResourceClusterCount} hillResources={generator.GeneratedHillResourceCount} mountains={generator.GeneratedMountainCount} links={generator.GeneratedJumpLinkCount}");
+            Debug.Log($"RAILGAME_PROCEDURAL_MAP_OK season={season} seed={generator.WorldSeed} hash={generator.LastLayoutHash} water={generator.GeneratedWaterCount} dirt={generator.GeneratedDirtCount} tree={generator.GeneratedTreeCount} iron={generator.GeneratedIronCount} resourceClusters={generator.GeneratedResourceClusterCount} hillResources={generator.GeneratedHillResourceCount} mountains={generator.GeneratedMountainCount} links={generator.GeneratedJumpLinkCount}");
         }
 
         private static void LogNavMeshReach(ProceduralMapGenerator generator, Vector3 start)
@@ -173,12 +215,19 @@ namespace Railgame.Editor
             Debug.LogError($"NAVMESH_REACH_DIAGNOSTIC lastReachableZ={lastReachableZ} vertices={triangulation.vertices.Length} activeLinks={activeLinks} rows={rows}");
         }
 
-        [MenuItem("Railgame/Validate 1000 Procedural Seeds")]
+        [MenuItem("Railgame/Validate 2000 Seasonal Seeds")]
         public static void ValidateSeedBatch()
         {
-            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            int springUnique = ValidateSeedBatchForScene(SpringScenePath, "Spring");
+            int summerUnique = ValidateSeedBatchForScene(SummerScenePath, "Summer");
+            Debug.Log($"RAILGAME_SEASON_2000_SEEDS_OK springUnique={springUnique} summerUnique={summerUnique}");
+        }
+
+        private static int ValidateSeedBatchForScene(string scenePath, string season)
+        {
+            EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
             ProceduralMapGenerator generator = Object.FindFirstObjectByType<ProceduralMapGenerator>();
-            Require(generator != null, "ProceduralMapGenerator missing");
+            Require(generator != null, $"{season} ProceduralMapGenerator missing");
 
             HashSet<string> hashes = new();
             const int firstSeed = 20260000;
@@ -191,18 +240,28 @@ namespace Railgame.Editor
             Require(first == repeated, "Logical generation is not deterministic");
             Require(hashes.Count >= 990, $"Layout diversity too low: {hashes.Count}/{seedCount}");
             generator.GenerateNow();
-            Debug.Log($"RAILGAME_PROCEDURAL_1000_SEEDS_OK seeds={seedCount} unique={hashes.Count}");
+            Debug.Log($"RAILGAME_PROCEDURAL_1000_SEEDS_OK season={season} seeds={seedCount} unique={hashes.Count}");
+            return hashes.Count;
         }
 
         public static void CaptureOverview()
         {
-            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
-            Camera camera = Camera.main;
-            Require(camera != null, "Procedural overview camera missing");
+            string springPath = Environment.GetEnvironmentVariable("RAILGAME_SPRING_CAPTURE");
+            if (string.IsNullOrWhiteSpace(springPath))
+                springPath = Path.GetFullPath("Temp/railgame-spring-overview.png");
+            string summerPath = Environment.GetEnvironmentVariable("RAILGAME_SUMMER_CAPTURE");
+            if (string.IsNullOrWhiteSpace(summerPath))
+                summerPath = Path.GetFullPath("Temp/railgame-summer-overview.png");
+            CaptureScene(SpringScenePath, springPath, "Spring");
+            CaptureScene(SummerScenePath, summerPath, "Summer");
+            Debug.Log($"RAILGAME_SEASON_CAPTURES_OK spring={springPath} summer={summerPath}");
+        }
 
-            string outputPath = Environment.GetEnvironmentVariable("RAILGAME_PROCEDURAL_CAPTURE");
-            if (string.IsNullOrWhiteSpace(outputPath))
-                outputPath = Path.GetFullPath("Temp/railgame-procedural-overview.png");
+        private static void CaptureScene(string scenePath, string outputPath, string season)
+        {
+            EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            Camera camera = Camera.main;
+            Require(camera != null, $"{season} procedural overview camera missing");
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? throw new InvalidOperationException("Invalid capture path"));
 
             RenderTexture target = new(1024, 2048, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
@@ -226,10 +285,13 @@ namespace Railgame.Editor
             }
 
             Require(File.Exists(outputPath) && new FileInfo(outputPath).Length > 0, "Procedural capture missing");
-            Debug.Log("RAILGAME_PROCEDURAL_CAPTURE_OK path=" + outputPath);
+            Debug.Log($"RAILGAME_PROCEDURAL_CAPTURE_OK season={season} path={outputPath}");
         }
 
-        private static MapGenerationProfile CreateProfile(string path, GameObject groundCell, GameObject boundary, float hillResourceChance)
+        private static MapGenerationProfile CreateProfile(string path, GameObject groundCell, GameObject boundary,
+            Material groundMaterial, Material dirtMaterial, Material waterMaterial, Material leavesMaterial,
+            float hillResourceChance, int riverWidth, int riverBendMin, int riverBendMax, int fordWidth,
+            int dirtBaseCount, int dirtIncreasePerLeg, float resourceSideBias)
         {
             MapGenerationProfile profile = AssetDatabase.LoadAssetAtPath<MapGenerationProfile>(path);
             if (profile == null)
@@ -253,9 +315,42 @@ namespace Railgame.Editor
             data.FindProperty("ironCount").intValue = 12;
             data.FindProperty("waterCellCount").intValue = 12;
             data.FindProperty("hillResourceChance").floatValue = hillResourceChance;
+            data.FindProperty("groundMaterial").objectReferenceValue = groundMaterial;
+            data.FindProperty("dirtMaterial").objectReferenceValue = dirtMaterial;
+            data.FindProperty("waterMaterial").objectReferenceValue = waterMaterial;
+            data.FindProperty("leavesMaterial").objectReferenceValue = leavesMaterial;
+            data.FindProperty("riverWidth").intValue = riverWidth;
+            data.FindProperty("riverBendMin").intValue = riverBendMin;
+            data.FindProperty("riverBendMax").intValue = riverBendMax;
+            data.FindProperty("fordWidth").intValue = fordWidth;
+            data.FindProperty("dirtBaseCount").intValue = dirtBaseCount;
+            data.FindProperty("dirtIncreasePerLeg").intValue = dirtIncreasePerLeg;
+            data.FindProperty("resourceSideBias").floatValue = resourceSideBias;
             data.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(profile);
             return profile;
+        }
+
+        private static Material CreateSeasonMaterial(string name, string templateFile, Color color)
+        {
+            string path = $"{MapFolder}/Materials/{name}.mat";
+            Material template = AssetDatabase.LoadAssetAtPath<Material>($"{MapFolder}/Materials/{templateFile}");
+            if (template == null)
+                throw new FileNotFoundException("Season material template missing.", templateFile);
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                material = new Material(template);
+                AssetDatabase.CreateAsset(material, path);
+            }
+            else
+            {
+                EditorUtility.CopySerialized(template, material);
+            }
+            material.name = name;
+            material.color = color;
+            EditorUtility.SetDirty(material);
+            return material;
         }
 
         private static GameObject CreateGroundCellPrefab()
@@ -340,12 +435,14 @@ namespace Railgame.Editor
             }
         }
 
-        private static void AddSceneToBuildSettings()
+        private static void AddScenesToBuildSettings()
         {
             List<EditorBuildSettingsScene> scenes = EditorBuildSettings.scenes
-                .Where(item => !string.Equals(item.path, ScenePath, StringComparison.OrdinalIgnoreCase))
+                .Where(item => !string.Equals(item.path, SpringScenePath, StringComparison.OrdinalIgnoreCase) &&
+                               !string.Equals(item.path, SummerScenePath, StringComparison.OrdinalIgnoreCase))
                 .ToList();
-            scenes.Insert(0, new EditorBuildSettingsScene(ScenePath, true));
+            scenes.Insert(0, new EditorBuildSettingsScene(SummerScenePath, true));
+            scenes.Insert(0, new EditorBuildSettingsScene(SpringScenePath, true));
             EditorBuildSettings.scenes = scenes.ToArray();
         }
 

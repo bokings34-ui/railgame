@@ -18,6 +18,10 @@ MonoBehaviour:
   waterPrefab: {fileID: 4411363752438155964, guid: 36d05fe8041c1ef4aa57950f9a27c68a, type: 3}
   boundaryPrefab: {fileID: 3196043692854484447, guid: a933761961b246e4089aabfe895b3be9, type: 3}
   backgroundMountainPrefab: {fileID: 8626841007931108869, guid: 3ec1360d76116ff4985912442e13a80a, type: 3}
+  groundMaterial: {fileID: 2100000, guid: 733c2ec8447dded4ca1e66630ed972f2, type: 2}
+  dirtMaterial: {fileID: 2100000, guid: fa1ae4257e4e4c54298ff7993ab97699, type: 2}
+  waterMaterial: {fileID: 2100000, guid: f2408f8417271ce40a3952e75512f147, type: 2}
+  leavesMaterial: {fileID: 2100000, guid: d489b4abb7f69244f84d0cdf17f56102, type: 2}
   treePrefab: {fileID: 7803733390791434323, guid: e1214c60dd664984f9e353e3381a74f4, type: 3}
   ironPrefab: {fileID: 4616430238710469055, guid: 52d019fe809e5ac4bb7493afe3aea02b, type: 3}
   railPrefab: {fileID: 0}
@@ -25,4 +29,11 @@ MonoBehaviour:
   treeCount: 12
   ironCount: 12
   waterCellCount: 12
-  hillResourceChance: 0.35
+  hillResourceChance: 0.25
+  riverWidth: 2
+  riverBendMin: 3
+  riverBendMax: 5
+  fordWidth: 5
+  dirtBaseCount: 8
+  dirtIncreasePerLeg: 2
+  resourceSideBias: 0.25
