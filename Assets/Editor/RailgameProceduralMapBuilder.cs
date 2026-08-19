@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Railgame.Map;
+using Railgame.Player;
 using Unity.AI.Navigation;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -21,6 +22,11 @@ namespace Railgame.Editor
         private const string PrefabFolder = MapFolder + "/Prefabs";
         private const string ProfileFolder = MapFolder + "/Profiles";
         private const string SceneFolder = MapFolder + "/Scenes";
+        private const string TextureFolder = MapFolder + "/Textures";
+        private const string PlayerFolder = "Assets/00.main/Player";
+        private const string PlayerPrefabFolder = PlayerFolder + "/Prefabs";
+        private const string PlayerPrefabPath = PlayerPrefabFolder + "/PF_RailgamePlayer.prefab";
+        private const string CharacterVisualPath = "Assets/00.main/Character/Prefabs/PF_RailgameCharacterVisual.prefab";
         private const string SpringProfilePath = ProfileFolder + "/MapGenerationProfile_Spring.asset";
         private const string SummerProfilePath = ProfileFolder + "/MapGenerationProfile_Summer.asset";
         private const string SpringScenePath = SceneFolder + "/Map_Procedural_Spring.unity";
@@ -30,16 +36,22 @@ namespace Railgame.Editor
         public static void Build()
         {
             EnsureFolder(ProfileFolder);
+            EnsureFolder(TextureFolder);
+            EnsureFolder(PlayerPrefabFolder);
+            CreateVoxelTextures();
+            ConfigureCharacterTextures();
             GameObject groundCell = CreateGroundCellPrefab();
             GameObject boundary = CreateBoundaryPrefab();
-            Material springGrass = CreateSeasonMaterial("M_Spring_Grass", "M_Grass.mat", new Color32(0x93, 0xC9, 0x5A, 0xFF));
-            Material springDirt = CreateSeasonMaterial("M_Spring_Dirt", "M_Dirt.mat", new Color32(0xA6, 0x68, 0x3F, 0xFF));
-            Material springLeaves = CreateSeasonMaterial("M_Spring_Leaves", "M_Leaves.mat", new Color32(0x7A, 0xC3, 0x4A, 0xFF));
-            Material springWater = CreateSeasonMaterial("M_Spring_Water", "M_Water.mat", new Color32(0x45, 0xBC, 0xE1, 0x9E));
-            Material summerGrass = CreateSeasonMaterial("M_Summer_Grass", "M_Grass.mat", new Color32(0x6D, 0xAA, 0x3E, 0xFF));
-            Material summerDirt = CreateSeasonMaterial("M_Summer_Dirt", "M_Dirt.mat", new Color32(0x87, 0x51, 0x2E, 0xFF));
-            Material summerLeaves = CreateSeasonMaterial("M_Summer_Leaves", "M_Leaves.mat", new Color32(0x43, 0x8A, 0x38, 0xFF));
-            Material summerWater = CreateSeasonMaterial("M_Summer_Water", "M_Water.mat", new Color32(0x24, 0x8E, 0xC8, 0x9E));
+            ConfigureWaterPrefab();
+            CreatePlayerPrefab();
+            Material springGrass = CreateSeasonMaterial("M_Spring_Grass", "M_Grass.mat", "T_Spring_Grass.asset", new Color32(0x93, 0xC9, 0x5A, 0xFF));
+            Material springDirt = CreateSeasonMaterial("M_Spring_Dirt", "M_Dirt.mat", "T_Spring_Dirt.asset", new Color32(0xA6, 0x68, 0x3F, 0xFF));
+            Material springLeaves = CreateSeasonMaterial("M_Spring_Leaves", "M_Leaves.mat", "T_Spring_Leaves.asset", new Color32(0x7A, 0xC3, 0x4A, 0xFF));
+            Material springWater = CreateSeasonMaterial("M_Spring_Water", "M_Water.mat", "T_Spring_Water.asset", new Color32(0x45, 0xBC, 0xE1, 0x9E));
+            Material summerGrass = CreateSeasonMaterial("M_Summer_Grass", "M_Grass.mat", "T_Summer_Grass.asset", new Color32(0x6D, 0xAA, 0x3E, 0xFF));
+            Material summerDirt = CreateSeasonMaterial("M_Summer_Dirt", "M_Dirt.mat", "T_Summer_Dirt.asset", new Color32(0x87, 0x51, 0x2E, 0xFF));
+            Material summerLeaves = CreateSeasonMaterial("M_Summer_Leaves", "M_Leaves.mat", "T_Summer_Leaves.asset", new Color32(0x43, 0x8A, 0x38, 0xFF));
+            Material summerWater = CreateSeasonMaterial("M_Summer_Water", "M_Water.mat", "T_Summer_Water.asset", new Color32(0x24, 0x8E, 0xC8, 0x9E));
 
             CreateProfile(SpringProfilePath, groundCell, boundary,
                 springGrass, springDirt, springWater, springLeaves, 0.25f, 2, 3, 5, 5, 8, 2, 0.25f);
@@ -94,8 +106,15 @@ namespace Railgame.Editor
             generatorData.FindProperty("buildNavMeshAfterGenerate").boolValue = false;
             generatorData.ApplyModifiedPropertiesWithoutUndo();
 
+            GameObject playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+            Require(playerPrefab != null, "Player prefab missing");
+            GameObject player = (GameObject)PrefabUtility.InstantiatePrefab(playerPrefab, root.transform);
+            player.name = "Player";
+            player.transform.localPosition = new Vector3(11.5f, 1.05f, 2.5f);
+            player.transform.localRotation = Quaternion.identity;
+
             BuildMarkers(root.transform);
-            BuildLightingAndCamera();
+            BuildLightingAndCamera(player.transform);
             generator.GenerateNow();
             generatorData.Update();
             generatorData.FindProperty("buildNavMeshAfterGenerate").boolValue = true;
@@ -121,6 +140,14 @@ namespace Railgame.Editor
                 "Summer profile settings mismatch");
             Require(spring.GroundMaterial != summer.GroundMaterial && spring.WaterMaterial != summer.WaterMaterial,
                 "Season material profiles are not distinct");
+            RequireVoxelMaterial(spring.GroundMaterial, "Spring grass");
+            RequireVoxelMaterial(spring.DirtMaterial, "Spring dirt");
+            RequireVoxelMaterial(spring.WaterMaterial, "Spring water");
+            RequireVoxelMaterial(spring.LeavesMaterial, "Spring leaves");
+            RequireVoxelMaterial(summer.GroundMaterial, "Summer grass");
+            RequireVoxelMaterial(summer.DirtMaterial, "Summer dirt");
+            RequireVoxelMaterial(summer.WaterMaterial, "Summer water");
+            RequireVoxelMaterial(summer.LeavesMaterial, "Summer leaves");
             ValidateScene(SpringScenePath, "Spring");
             ValidateScene(SummerScenePath, "Summer");
             Debug.Log("RAILGAME_SEASON_MAPS_VALIDATE_OK seasons=2");
@@ -137,6 +164,9 @@ namespace Railgame.Editor
             Require(generator != null, "ProceduralMapGenerator missing");
             Require(navigation != null && navigation.Surface != null, "Runtime navigation wiring missing");
             Require(generator.Profile != null, "Map profile missing");
+            RailgamePlayerController player = Object.FindFirstObjectByType<RailgamePlayerController>();
+            Require(player != null && player.GetComponent<CharacterController>() != null, "Player movement wiring missing");
+            Require(player.JumpHeight > 1f && player.WaterSpeedMultiplier < 1f, "Player jump or water slowdown settings mismatch");
 
             generator.GenerateNow();
             string firstHash = generator.LastLayoutHash;
@@ -170,6 +200,8 @@ namespace Railgame.Editor
             int disabledWaterBasins = generator.GetComponentsInChildren<Transform>(true)
                 .Count(item => item.name == "BasinFloor" && !item.gameObject.activeSelf);
             Require(disabledWaterBasins == generator.GeneratedWaterCount, "Water prefab basin floors overlap the continuous safety floor");
+            Require(generator.GetComponentsInChildren<WaterSlowVolume>(true).Length == generator.GeneratedWaterCount,
+                "Water slowdown volumes are incomplete");
 
             Vector3 start = generator.transform.TransformPoint(new Vector3(11.5f, 1f, 2.5f));
             Vector3 goal = generator.transform.TransformPoint(new Vector3(11.5f, 1f, 125.5f));
@@ -331,7 +363,7 @@ namespace Railgame.Editor
             return profile;
         }
 
-        private static Material CreateSeasonMaterial(string name, string templateFile, Color color)
+        private static Material CreateSeasonMaterial(string name, string templateFile, string textureFile, Color color)
         {
             string path = $"{MapFolder}/Materials/{name}.mat";
             Material template = AssetDatabase.LoadAssetAtPath<Material>($"{MapFolder}/Materials/{templateFile}");
@@ -348,9 +380,118 @@ namespace Railgame.Editor
                 EditorUtility.CopySerialized(template, material);
             }
             material.name = name;
-            material.color = color;
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TextureFolder}/{textureFile}");
+            material.mainTexture = texture;
+            material.color = texture != null ? Color.white : color;
+            material.SetFloat("_Smoothness", 0f);
+            material.SetFloat("_SpecularHighlights", 0f);
             EditorUtility.SetDirty(material);
             return material;
+        }
+
+        private static void CreateVoxelTextures()
+        {
+            CreatePixelTexture("T_Spring_Grass", new Color32(0x93, 0xC9, 0x5A, 0xFF), new Color32(0xA8, 0xD8, 0x72, 0xFF), new Color32(0x76, 0xAD, 0x43, 0xFF), 11, PixelPattern.Scatter);
+            CreatePixelTexture("T_Spring_Dirt", new Color32(0xA6, 0x68, 0x3F, 0xFF), new Color32(0xBE, 0x7D, 0x50, 0xFF), new Color32(0x7E, 0x48, 0x2D, 0xFF), 17, PixelPattern.Clusters);
+            CreatePixelTexture("T_Spring_Leaves", new Color32(0x7A, 0xC3, 0x4A, 0xFF), new Color32(0x94, 0xD6, 0x61, 0xFF), new Color32(0x55, 0x9B, 0x35, 0xFF), 23, PixelPattern.Clusters);
+            CreatePixelTexture("T_Spring_Water", new Color32(0x45, 0xBC, 0xE1, 0xA8), new Color32(0x76, 0xD4, 0xEB, 0xB0), new Color32(0x2A, 0x98, 0xC8, 0xA8), 29, PixelPattern.Waves);
+            CreatePixelTexture("T_Summer_Grass", new Color32(0x6D, 0xAA, 0x3E, 0xFF), new Color32(0x82, 0xBC, 0x50, 0xFF), new Color32(0x4F, 0x85, 0x2D, 0xFF), 31, PixelPattern.Scatter);
+            CreatePixelTexture("T_Summer_Dirt", new Color32(0x87, 0x51, 0x2E, 0xFF), new Color32(0xA1, 0x67, 0x3D, 0xFF), new Color32(0x63, 0x37, 0x22, 0xFF), 37, PixelPattern.Clusters);
+            CreatePixelTexture("T_Summer_Leaves", new Color32(0x43, 0x8A, 0x38, 0xFF), new Color32(0x58, 0xA2, 0x48, 0xFF), new Color32(0x2E, 0x69, 0x2A, 0xFF), 41, PixelPattern.Clusters);
+            CreatePixelTexture("T_Summer_Water", new Color32(0x24, 0x8E, 0xC8, 0xA8), new Color32(0x4A, 0xAD, 0xD8, 0xB0), new Color32(0x1C, 0x6E, 0xA6, 0xA8), 43, PixelPattern.Waves);
+            Texture2D stone = CreatePixelTexture("T_Stone", new Color32(0x5D, 0x66, 0x70, 0xFF), new Color32(0x77, 0x81, 0x8A, 0xFF), new Color32(0x43, 0x4B, 0x55, 0xFF), 47, PixelPattern.Clusters);
+            Texture2D trunk = CreatePixelTexture("T_Trunk", new Color32(0x75, 0x46, 0x2B, 0xFF), new Color32(0x91, 0x5C, 0x37, 0xFF), new Color32(0x54, 0x31, 0x20, 0xFF), 53, PixelPattern.Stripes);
+            ApplyVoxelTextureToMaterial("M_Stone.mat", stone);
+            ApplyVoxelTextureToMaterial("M_Trunk.mat", trunk);
+        }
+
+        private static Texture2D CreatePixelTexture(string name, Color32 baseColor, Color32 light, Color32 dark, int seed, PixelPattern pattern)
+        {
+            string path = $"{TextureFolder}/{name}.asset";
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (texture == null)
+            {
+                texture = new Texture2D(16, 16, TextureFormat.RGBA32, false) { name = name };
+                AssetDatabase.CreateAsset(texture, path);
+            }
+            else
+            {
+                texture.Reinitialize(16, 16, TextureFormat.RGBA32, false);
+            }
+
+            Color32[] pixels = new Color32[256];
+            for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++)
+            {
+                int noise = Mathf.Abs((x * 73 + y * 151 + seed * 199) ^ ((x + seed) * (y + 17))) % 100;
+                pixels[y * 16 + x] = pattern switch
+                {
+                    PixelPattern.Waves => (y % 5 == 1 && noise < 65) ? light : (y % 5 == 3 && noise < 45) ? dark : baseColor,
+                    PixelPattern.Stripes => (x + seed) % 5 == 0 ? dark : (x + seed) % 5 == 2 ? light : baseColor,
+                    PixelPattern.Clusters => noise < 18 ? dark : noise > 82 ? light : baseColor,
+                    _ => noise < 10 ? dark : noise > 89 ? light : baseColor
+                };
+            }
+
+            texture.SetPixels32(pixels);
+            texture.filterMode = FilterMode.Point;
+            texture.wrapMode = TextureWrapMode.Repeat;
+            texture.anisoLevel = 0;
+            texture.Apply(false, false);
+            EditorUtility.SetDirty(texture);
+            return texture;
+        }
+
+        private static void ApplyVoxelTextureToMaterial(string materialFile, Texture2D texture)
+        {
+            Material material = AssetDatabase.LoadAssetAtPath<Material>($"{MapFolder}/Materials/{materialFile}");
+            if (material == null)
+                return;
+            material.mainTexture = texture;
+            material.color = Color.white;
+            material.SetFloat("_Smoothness", 0f);
+            material.SetFloat("_SpecularHighlights", 0f);
+            EditorUtility.SetDirty(material);
+        }
+
+        private static void ConfigureCharacterTextures()
+        {
+            string[] paths =
+            {
+                "Assets/00.main/Character/Source/Textures/Cute_Ghost_skin.jpg",
+                "Assets/00.main/Character/Source/Textures/Cute_Ghost_face.png"
+            };
+            foreach (string path in paths)
+                if (AssetImporter.GetAtPath(path) is TextureImporter importer)
+                {
+                    importer.maxTextureSize = 128;
+                    importer.filterMode = FilterMode.Point;
+                    importer.mipmapEnabled = false;
+                    importer.textureCompression = TextureImporterCompression.Uncompressed;
+                    importer.SaveAndReimport();
+                }
+
+            foreach (string path in new[]
+                     {
+                         "Assets/00.main/Character/Materials/M_CharacterGhost_Body.mat",
+                         "Assets/00.main/Character/Materials/M_CharacterGhost_Face.mat"
+                     })
+            {
+                Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (material == null)
+                    continue;
+                material.SetFloat("_Smoothness", 0f);
+                material.SetFloat("_SpecularHighlights", 0f);
+                EditorUtility.SetDirty(material);
+            }
+        }
+
+        private enum PixelPattern
+        {
+            Scatter,
+            Clusters,
+            Waves,
+            Stripes
         }
 
         private static GameObject CreateGroundCellPrefab()
@@ -382,6 +523,53 @@ namespace Railgame.Editor
             return prefab;
         }
 
+        private static void ConfigureWaterPrefab()
+        {
+            string path = PrefabFolder + "/PF_WaterCell_1x1.prefab";
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            try
+            {
+                Transform slowVolume = root.transform.Find("SlowVolume");
+                Require(slowVolume != null && slowVolume.TryGetComponent(out BoxCollider trigger) && trigger.isTrigger,
+                    "Water SlowVolume trigger missing");
+                if (slowVolume.GetComponent<WaterSlowVolume>() == null)
+                    slowVolume.gameObject.AddComponent<WaterSlowVolume>();
+                PrefabUtility.SaveAsPrefabAsset(root, path);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        private static void CreatePlayerPrefab()
+        {
+            GameObject visualPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(CharacterVisualPath);
+            if (visualPrefab == null)
+                throw new FileNotFoundException("Character visual prefab missing.", CharacterVisualPath);
+
+            GameObject root = new("PF_RailgamePlayer");
+            try
+            {
+                CharacterController controller = root.AddComponent<CharacterController>();
+                controller.radius = 0.34f;
+                controller.height = 1.8f;
+                controller.center = new Vector3(0f, 0.9f, 0f);
+                controller.stepOffset = 0.25f;
+                controller.skinWidth = 0.04f;
+                root.AddComponent<RailgamePlayerController>();
+
+                GameObject visual = (GameObject)PrefabUtility.InstantiatePrefab(visualPrefab, root.transform);
+                visual.name = "Visual";
+                visual.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+                PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefabPath);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
         private static void BuildMarkers(Transform parent)
         {
             GameObject markers = new("Markers");
@@ -403,7 +591,7 @@ namespace Railgame.Editor
             marker.GetComponent<Renderer>().sharedMaterial = material;
         }
 
-        private static void BuildLightingAndCamera()
+        private static void BuildLightingAndCamera(Transform player)
         {
             GameObject cameraObject = new("Procedural Overview Camera");
             Camera camera = cameraObject.AddComponent<Camera>();
@@ -415,6 +603,8 @@ namespace Railgame.Editor
             camera.farClipPlane = 250f;
             cameraObject.transform.position = new Vector3(0f, 150f, 64f);
             cameraObject.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            RailgameCameraFollow follow = cameraObject.AddComponent<RailgameCameraFollow>();
+            follow.SetTarget(player);
 
             GameObject lightObject = new("Directional Light");
             Light light = lightObject.AddComponent<Light>();
@@ -470,6 +660,13 @@ namespace Railgame.Editor
         {
             if (!condition)
                 throw new InvalidOperationException(message);
+        }
+
+        private static void RequireVoxelMaterial(Material material, string label)
+        {
+            Require(material != null && material.mainTexture is Texture2D texture && texture.width == 16 &&
+                    texture.height == 16 && texture.filterMode == FilterMode.Point,
+                $"{label} voxel texture wiring mismatch");
         }
     }
 }
