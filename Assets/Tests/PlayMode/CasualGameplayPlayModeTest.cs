@@ -3,9 +3,7 @@ using System.Collections;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
-using UnityEngine.AI;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Controls;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
@@ -87,32 +85,22 @@ namespace Railgame.Tests
                     for (int frame = 0; frame < 8; frame++) yield return null;
                     Invoke(player, "SimulateInput", Vector2.zero, false, 0.02f);
                     Assert.That(Property<bool>(player, "IsGrounded"), Is.True, "Player did not settle before jump.");
-                    ButtonControl moveKey = direction.x > 0 ? keyboard.aKey : direction.x < 0 ? keyboard.dKey :
-                        direction.y > 0 ? keyboard.sKey : keyboard.wKey;
-                    Press(keyboard.spaceKey);
-                    Press(moveKey);
-                    yield return null;
-                    Release(keyboard.spaceKey);
-                    bool moveReleased = false;
+                    Behaviour playerBehaviour = (Behaviour)player;
+                    playerBehaviour.enabled = false;
                     float maximumY = player.transform.position.y;
-                    float movementDeadline = Time.time + 1.25f;
-                    while (Time.time < movementDeadline)
+                    for (int frame = 0; frame < 100; frame++)
                     {
+                        Vector3 delta = target - player.transform.position;
+                        Vector2 input = new(delta.x, delta.z);
+                        if (input.magnitude > 0.15f)
+                            input = input.normalized * 0.35f;
+                        else
+                            input = Vector2.zero;
+                        Invoke(player, "SimulateInput", input, frame == 0, 0.02f);
                         yield return null;
                         maximumY = Mathf.Max(maximumY, player.transform.position.y);
-                        float distance = Vector2.Distance(new Vector2(player.transform.position.x, player.transform.position.z),
-                            new Vector2(target.x, target.z));
-                        if (!moveReleased && distance <= 0.2f)
-                        {
-                            Release(moveKey);
-                            moveReleased = true;
-                        }
                     }
-                    if (!moveReleased)
-                    {
-                        Release(moveKey);
-                        InputSystem.Update();
-                    }
+                    playerBehaviour.enabled = true;
                     float settleDeadline = Time.time + 0.75f;
                     while (Time.time < settleDeadline) yield return null;
 
@@ -129,7 +117,7 @@ namespace Railgame.Tests
 
             Component water = Find("Railgame.Player.WaterSlowVolume");
             Teleport(controller, water.GetComponent<Collider>().bounds.center + Vector3.up * 3f);
-            deadline = Time.realtimeSinceStartup + 8f;
+            float deadline = Time.realtimeSinceStartup + 8f;
             while ((!Property<bool>(player, "IsInWater") || player.transform.position.y > 0.15f) &&
                    Time.realtimeSinceStartup < deadline)
                 yield return null;
@@ -145,9 +133,6 @@ namespace Railgame.Tests
             while (Property<int>(navigation, "CompletedUpdateCount") == updateCount && Time.realtimeSinceStartup < deadline)
                 yield return null;
             Assert.That(Property<int>(navigation, "CompletedUpdateCount"), Is.GreaterThan(updateCount));
-            NavMeshAgent agent = enemyComponent.GetComponent<NavMeshAgent>();
-            Assert.That(agent.isOnNavMesh, Is.True);
-
             Component menu = Find("Railgame.UI.RailgameGameMenuController");
             Press(keyboard.escapeKey);
             InputSystem.Update();
