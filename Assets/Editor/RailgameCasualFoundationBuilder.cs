@@ -21,8 +21,6 @@ namespace Railgame.Editor
     {
         public const string LobbyScenePath = "Assets/00.main/UI/Scenes/Railgame_Lobby.unity";
         public const string GameplayUiPrefabPath = "Assets/00.main/UI/Prefabs/PF_CasualGameplayUI.prefab";
-        public const string DummyEnemyPrefabPath = "Assets/00.main/Enemy/Prefabs/PF_DummyEnemy.prefab";
-
         private const string SettingsPrefabPath = "Assets/00.main/UI/Prefabs/PF_SettingsPanel.prefab";
         private const string ShopPrefabPath = "Assets/00.main/UI/Prefabs/PF_ShopScreen.prefab";
         private static readonly Color Ink = new(0.12f, 0.14f, 0.18f, 1f);
@@ -41,19 +39,15 @@ namespace Railgame.Editor
         {
             EnsureFolder("Assets/00.main/UI/Scenes");
             EnsureFolder("Assets/00.main/UI/Prefabs");
-            EnsureFolder("Assets/00.main/Enemy/Prefabs");
             CreateSettingsPrefab();
             CreateShopPrefab();
             CreateGameplayUiPrefab();
-            CreateDummyEnemyPrefab();
         }
 
-        public static void AddGameplayFoundation(Transform sceneRoot, Transform player, Transform enemyRoot,
-            RuntimeNavigationController navigation)
+        public static void AddGameplayFoundation(Transform sceneRoot)
         {
             GameObject uiPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(GameplayUiPrefabPath);
-            GameObject dummyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(DummyEnemyPrefabPath);
-            Require(uiPrefab != null && dummyPrefab != null, "Casual gameplay prefabs missing");
+            Require(uiPrefab != null, "Casual gameplay UI prefab missing");
 
             GameObject ui = (GameObject)PrefabUtility.InstantiatePrefab(uiPrefab, sceneRoot);
             ui.name = "CasualSoloUI";
@@ -67,8 +61,6 @@ namespace Railgame.Editor
             }
 
             CreateEventSystem(sceneRoot);
-            DummyEnemySpawner spawner = enemyRoot.gameObject.AddComponent<DummyEnemySpawner>();
-            spawner.Configure(navigation, player, dummyPrefab.GetComponent<DummyEnemyChaser>());
         }
 
         public static void BuildLobbyScene()
@@ -125,8 +117,6 @@ namespace Railgame.Editor
         public static void Validate()
         {
             Require(AssetDatabase.LoadAssetAtPath<GameObject>(GameplayUiPrefabPath) != null, "Gameplay UI prefab missing");
-            Require(AssetDatabase.LoadAssetAtPath<GameObject>(DummyEnemyPrefabPath)?.GetComponent<DummyEnemyChaser>() != null,
-                "Dummy enemy prefab missing chaser");
 
             Scene lobby = EditorSceneManager.OpenScene(LobbyScenePath, OpenSceneMode.Single);
             Require(Object.FindAnyObjectByType<RailgameLobbyController>() != null, "Lobby controller missing");
@@ -136,7 +126,7 @@ namespace Railgame.Editor
 
             ValidateGameplayScene("Assets/00.main/Map/Scenes/Map_Procedural_Spring.unity", "Spring");
             ValidateGameplayScene("Assets/00.main/Map/Scenes/Map_Procedural_Summer.unity", "Summer");
-            Debug.Log("RAILGAME_CASUAL_FOUNDATION_OK lobby=1 settings=1 pause=2 shop=2 spawnMarkers=16 dummyChaser=2");
+            Debug.Log("RAILGAME_CASUAL_FOUNDATION_OK lobby=1 settings=1 pause=2 shop=2 spawnMarkers=16");
         }
 
         public static void Capture()
@@ -178,7 +168,6 @@ namespace Railgame.Editor
             EnemySpawnMarker[] markers = Object.FindObjectsByType<EnemySpawnMarker>(FindObjectsInactive.Include);
             Require(markers.Length == 8,
                 $"{season} enemy spawn marker count mismatch");
-            Require(Object.FindAnyObjectByType<DummyEnemySpawner>() != null, $"{season} dummy spawner missing");
             Require(Object.FindAnyObjectByType<RailgameGameMenuController>(FindObjectsInactive.Include) != null,
                 $"{season} game menu missing");
             Require(Object.FindAnyObjectByType<RailgameShopScreen>(FindObjectsInactive.Include) != null,
@@ -329,28 +318,6 @@ namespace Railgame.Editor
             settingsPanel.SetActive(false);
             shopPanel.SetActive(false);
             SavePrefab(root, GameplayUiPrefabPath);
-        }
-
-        private static void CreateDummyEnemyPrefab()
-        {
-            Material material = CreateMaterial("Assets/00.main/Enemy/Prefabs/M_DummyEnemy.mat", Coral);
-            GameObject root = new("PF_DummyEnemy");
-            NavMeshAgent agent = root.AddComponent<NavMeshAgent>();
-            agent.radius = 0.3f;
-            agent.height = 1.5f;
-            agent.speed = 3.6f;
-            agent.angularSpeed = 720f;
-            agent.acceleration = 18f;
-            agent.stoppingDistance = 0.75f;
-            root.AddComponent<DummyEnemyChaser>();
-            GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            visual.name = "VoxelVisual";
-            visual.transform.SetParent(root.transform, false);
-            visual.transform.localPosition = new Vector3(0f, 0.75f, 0f);
-            visual.transform.localScale = new Vector3(0.7f, 1.5f, 0.7f);
-            Object.DestroyImmediate(visual.GetComponent<Collider>());
-            visual.GetComponent<Renderer>().sharedMaterial = material;
-            SavePrefab(root, DummyEnemyPrefabPath);
         }
 
         private static GameObject CreateCanvas(string name)

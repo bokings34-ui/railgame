@@ -15,7 +15,7 @@ namespace Railgame.Tests
     public sealed class CasualGameplayPlayModeTest : InputTestFixture
     {
         [UnityTest]
-        public IEnumerator LobbyToSummerSpawnsChasingEnemy()
+        public IEnumerator LobbyToSummerLoadsGameplayFoundation()
         {
             Time.timeScale = 1f;
             InputSystem.AddDevice<Keyboard>();
@@ -27,18 +27,7 @@ namespace Railgame.Tests
 
             Assert.That(Find("Railgame.Player.RailgamePlayerController"), Is.Not.Null);
             Assert.That(Find("Railgame.Player.WaterSlowVolume"), Is.Not.Null);
-            Component spawner = Find("Railgame.Enemy.DummyEnemySpawner");
-            Object enemy = null;
-            float deadline = Time.realtimeSinceStartup + 12f;
-            while (enemy == null && Time.realtimeSinceStartup < deadline)
-            {
-                enemy = Property<Object>(spawner, "SpawnedEnemy");
-                yield return null;
-            }
-            Assert.That(enemy, Is.Not.Null);
-            while (Property<object>(enemy, "State").ToString() != "Chasing" && Time.realtimeSinceStartup < deadline)
-                yield return null;
-            Assert.That(Property<object>(enemy, "State").ToString(), Is.EqualTo("Chasing"));
+            Assert.That(Find("Railgame.UI.RailgameGameMenuController"), Is.Not.Null);
         }
 
         [UnityTest]
@@ -62,9 +51,7 @@ namespace Railgame.Tests
             yield return null;
 
             Component player = Find("Railgame.Player.RailgamePlayerController");
-            Component spawner = Find("Railgame.Enemy.DummyEnemySpawner");
             Assert.That(player, Is.Not.Null);
-            Assert.That(spawner, Is.Not.Null);
 
             Vector3 playerStart = player.transform.position;
             for (int frame = 0; frame < 20; frame++)
@@ -73,22 +60,6 @@ namespace Railgame.Tests
                 yield return null;
             }
             Assert.That(player.transform.position.z - playerStart.z, Is.GreaterThan(0.5f));
-
-            Object enemy = null;
-            float deadline = Time.realtimeSinceStartup + 12f;
-            while (enemy == null && Time.realtimeSinceStartup < deadline)
-            {
-                enemy = Property<Object>(spawner, "SpawnedEnemy");
-                yield return null;
-            }
-            Assert.That(enemy, Is.Not.Null, "Dummy enemy did not spawn.");
-            Component enemyComponent = (Component)enemy;
-            Vector3 enemyStart = enemyComponent.transform.position;
-            while (Property<object>(enemyComponent, "State").ToString() != "Chasing" &&
-                   Time.realtimeSinceStartup < deadline)
-                yield return null;
-            Assert.That(Property<object>(enemyComponent, "State").ToString(), Is.EqualTo("Chasing"));
-            Assert.That(Vector3.Distance(enemyStart, enemyComponent.transform.position), Is.GreaterThan(1f));
 
             Component generator = Find("Railgame.Map.ProceduralMapGenerator");
             foreach (Component slot in FindAll("Railgame.Map.ResourceSpawnSlot"))

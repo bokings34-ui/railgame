@@ -117,7 +117,7 @@ namespace Railgame.Editor
 
             BuildMarkers(root.transform);
             BuildLightingAndCamera(player.transform);
-            RailgameCasualFoundationBuilder.AddGameplayFoundation(root.transform, player.transform, enemies.transform, navigation);
+            RailgameCasualFoundationBuilder.AddGameplayFoundation(root.transform);
             generator.GenerateNow();
             generatorData.Update();
             generatorData.FindProperty("buildNavMeshAfterGenerate").boolValue = true;
