@@ -30,7 +30,7 @@ namespace Railgame.Hansol.ShoulderView
             yield return null;
             yield return null;
             yield return new WaitForEndOfFrame();
-            Capture(fileName);
+            Capture(SeasonFileName(fileName));
             yield return new WaitForSeconds(0.75f);
 
             if (runInteractionScenario && interactor != null)
@@ -40,14 +40,14 @@ namespace Railgame.Hansol.ShoulderView
                 Debug.Log($"SHOULDER_VIEW_EVIDENCE_INTERACTION opened={opened}");
                 yield return null;
                 yield return new WaitForEndOfFrame();
-                Capture("ShoulderView_Shop_Open_Evidence.png");
+                Capture(SeasonFileName("ShoulderView_Shop_Open_Evidence.png"));
                 yield return new WaitForSeconds(0.75f);
 
                 bool purchased = shopPanel != null && shopPanel.TryPurchase(0);
                 Debug.Log($"SHOULDER_VIEW_EVIDENCE_PURCHASE purchased={purchased}");
                 yield return null;
                 yield return new WaitForEndOfFrame();
-                Capture("ShoulderView_Shop_Purchased_Evidence.png");
+                Capture(SeasonFileName("ShoulderView_Shop_Purchased_Evidence.png"));
                 yield return new WaitForSeconds(1f);
             }
 
@@ -99,6 +99,12 @@ namespace Railgame.Hansol.ShoulderView
                     && int.TryParse(arguments[index + 1], out int value))
                     return value;
             return fallback;
+        }
+
+        private static string SeasonFileName(string original)
+        {
+            string label = ShoulderSeasonPreview.ReadSeasonLabel();
+            return $"{Path.GetFileNameWithoutExtension(original)}_{label}{Path.GetExtension(original)}";
         }
     }
 }

@@ -38,6 +38,9 @@ namespace Railgame.Hansol.ShoulderView.Editor
 
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             BuildLighting();
+            ShoulderSeasonPreview seasonPreview =
+                new GameObject("SeasonPreview").AddComponent<ShoulderSeasonPreview>();
+            seasonPreview.Initialize(groundMaterial, accentMaterial, obstacleMaterial, leafMaterial);
             BuildEnvironment(groundMaterial, accentMaterial, obstacleMaterial, leafMaterial);
 
             GameObject player = BuildPlayer(settings, playerMaterial);

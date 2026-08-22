@@ -205,6 +205,31 @@ namespace Railgame.Hansol.ShoulderView.Tests
             Assert.That(button.transform.localScale, Is.EqualTo(Vector3.one));
         }
 
+        [Test]
+        public void SeasonPreviewSwapsOnlyItsAssignedPaletteMaterials()
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            Assert.That(shader, Is.Not.Null);
+            Material ground = Track(new Material(shader));
+            Material water = Track(new Material(shader));
+            Material earth = Track(new Material(shader));
+            Material leaves = Track(new Material(shader));
+            ShoulderSeasonPreview preview =
+                Track(new GameObject("SeasonPreviewTest")).AddComponent<ShoulderSeasonPreview>();
+            preview.Initialize(ground, water, earth, leaves);
+
+            preview.Apply(ShoulderSeasonPreview.Season.Spring);
+            Color springGround = ground.color;
+            Color springWater = water.color;
+
+            preview.Apply(ShoulderSeasonPreview.Season.Summer);
+
+            Assert.That(preview.ActiveSeason, Is.EqualTo(ShoulderSeasonPreview.Season.Summer));
+            Assert.That(ground.color, Is.Not.EqualTo(springGround));
+            Assert.That(water.color, Is.Not.EqualTo(springWater));
+            Assert.That(ground.color.g, Is.LessThan(springGround.g));
+        }
+
         private T Track<T>(T item) where T : Object
         {
             cleanup.Add(item);
