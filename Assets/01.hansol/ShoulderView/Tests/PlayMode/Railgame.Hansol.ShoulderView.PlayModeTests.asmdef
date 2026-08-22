@@ -1,0 +1,11 @@
+{
+  "name": "Railgame.Hansol.ShoulderView.PlayModeTests",
+  "rootNamespace": "Railgame.Hansol.ShoulderView.Tests",
+  "references": [
+    "Railgame.Hansol.ShoulderView"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false
+}
