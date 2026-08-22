@@ -6,15 +6,6 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/00.main/UI/Scenes/Railgame_Lobby.unity
-    guid: 46493d49e536cbd42b17313c1aedb575
-  - enabled: 1
-    path: Assets/00.main/Map/Scenes/Map_Procedural_Spring.unity
-    guid: df0415b8aafd839448e677e50074f5dc
-  - enabled: 1
-    path: Assets/00.main/Map/Scenes/Map_Procedural_Summer.unity
-    guid: d40e0566370444046b8a6e280645b058
-  - enabled: 1
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
   m_configObjects:
