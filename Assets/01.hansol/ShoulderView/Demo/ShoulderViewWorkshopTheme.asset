@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d97175d96e7bd54096c451d6fb6f485, type: 3}
+  m_Name: ShoulderViewWorkshopTheme
+  m_EditorClassIdentifier: Railgame.Hansol.ShoulderView::Railgame.Hansol.ShoulderView.ShoulderUiTheme
+  canvasDimmer: {r: 0.035, g: 0.055, b: 0.09, a: 0.88}
+  hudBar: {r: 0.075, g: 0.105, b: 0.14, a: 0.96}
+  panel: {r: 0.2, g: 0.14, b: 0.085, a: 0.98}
+  card: {r: 0.91, g: 0.82, b: 0.62, a: 1}
+  inset: {r: 0.075, g: 0.105, b: 0.14, a: 0.96}
+  header: {r: 0.15, g: 0.58, b: 0.66, a: 1}
+  primaryButton: {r: 0.15, g: 0.58, b: 0.66, a: 1}
+  dangerButton: {r: 0.72, g: 0.25, b: 0.24, a: 1}
+  focus: {r: 0.95, g: 0.76, b: 0.24, a: 1}
+  primaryText: {r: 0.09, g: 0.13, b: 0.18, a: 1}
+  lightText: {r: 0.96, g: 0.92, b: 0.82, a: 1}
+  secondaryText: {r: 0.61, g: 0.68, b: 0.72, a: 1}
+  positiveText: {r: 0.48, g: 0.86, b: 0.64, a: 1}
+  disabled: {r: 0.3, g: 0.33, b: 0.35, a: 0.82}
+  panelSprite: {fileID: -3615068046733270204, guid: 070dd47aa06b45249b0978e24cd5ff46, type: 3}
+  cardSprite: {fileID: -9002124549173256960, guid: 070dd47aa06b45249b0978e24cd5ff46, type: 3}
+  focusedCardSprite: {fileID: -9002124549173256960, guid: 070dd47aa06b45249b0978e24cd5ff46, type: 3}
+  headerSprite: {fileID: -6707014793916702300, guid: 070dd47aa06b45249b0978e24cd5ff46, type: 3}
+  primaryButtonSprite: {fileID: 4840391630668541875, guid: 070dd47aa06b45249b0978e24cd5ff46, type: 3}
+  primaryButtonPressedSprite: {fileID: 0}
+  dangerButtonSprite: {fileID: -54213486877087546, guid: 070dd47aa06b45249b0978e24cd5ff46, type: 3}
+  dangerButtonPressedSprite: {fileID: 0}
+  promptSprite: {fileID: -6196526212713765612, guid: 070dd47aa06b45249b0978e24cd5ff46, type: 3}
+  currencyIconSprite: {fileID: -5599540768453350609, guid: 070dd47aa06b45249b0978e24cd5ff46, type: 3}

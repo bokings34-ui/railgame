@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 namespace Railgame.Hansol.ShoulderView.Tests
 {
@@ -168,6 +169,40 @@ namespace Railgame.Hansol.ShoulderView.Tests
             Assert.That(camera.fieldOfView, Is.EqualTo(78f).Within(0.01f));
             Assert.That(rig.InvertVerticalLook, Is.True);
             Assert.That(rig.IsRightShoulder, Is.False);
+        }
+
+        [Test]
+        public void UiThemeAppliesSemanticFallbackWithoutSprites()
+        {
+            ShoulderUiTheme theme = Track(ScriptableObject.CreateInstance<ShoulderUiTheme>());
+            GameObject card = Track(new GameObject("ThemeCard", typeof(RectTransform), typeof(CanvasRenderer),
+                typeof(Image)));
+            Image image = card.GetComponent<Image>();
+            ShoulderUiSkinElement skin = card.AddComponent<ShoulderUiSkinElement>();
+            skin.Initialize(ShoulderUiRole.Card);
+
+            skin.Apply(theme);
+
+            Assert.That(image.sprite, Is.Null);
+            Assert.That(image.type, Is.EqualTo(Image.Type.Simple));
+            Assert.That(image.color, Is.EqualTo(theme.GetColor(ShoulderUiRole.Card)));
+        }
+
+        [Test]
+        public void UiFocusFeedbackProvidesFocusAndPressedScaleStates()
+        {
+            GameObject button = Track(new GameObject("FocusButton", typeof(RectTransform)));
+            ShoulderUiFocusFeedback feedback = button.AddComponent<ShoulderUiFocusFeedback>();
+
+            feedback.OnSelect(null);
+            Assert.That(button.transform.localScale.x, Is.GreaterThan(1f));
+
+            feedback.OnPointerDown(null);
+            Assert.That(button.transform.localScale.x, Is.LessThan(1f));
+
+            feedback.OnPointerUp(null);
+            feedback.OnDeselect(null);
+            Assert.That(button.transform.localScale, Is.EqualTo(Vector3.one));
         }
 
         private T Track<T>(T item) where T : Object

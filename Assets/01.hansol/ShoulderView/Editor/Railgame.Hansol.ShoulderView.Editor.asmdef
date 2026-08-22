@@ -3,6 +3,7 @@
   "rootNamespace": "Railgame.Hansol.ShoulderView.Editor",
   "references": [
     "Railgame.Hansol.ShoulderView",
+    "Unity.2D.Sprite.Editor",
     "Unity.InputSystem",
     "Unity.InputSystem.UI",
     "Unity.ugui"
