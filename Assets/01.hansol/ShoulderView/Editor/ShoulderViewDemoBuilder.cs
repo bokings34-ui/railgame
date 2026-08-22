@@ -15,6 +15,8 @@ namespace Railgame.Hansol.ShoulderView.Editor
         private const string ScenePath = DemoRoot + "/ShoulderView_UI_Demo.unity";
         private const string SettingsPath = DemoRoot + "/ShoulderViewDemoSettings.asset";
         private const string ThemePath = DemoRoot + "/ShoulderViewWorkshopTheme.asset";
+        private const string LocalTinySwordsThemePath =
+            "Assets/01.hansol/ShoulderView/UI/ThirdParty/TinySwordsLocal/ShoulderViewTinySwordsLocalTheme.asset";
 
         private static readonly Color Navy = new(0.035f, 0.055f, 0.09f, 0.96f);
         private static readonly Color Panel = new(0.055f, 0.085f, 0.13f, 0.95f);
@@ -28,7 +30,8 @@ namespace Railgame.Hansol.ShoulderView.Editor
             EnsureFolders();
             ShoulderViewSettings settings = LoadOrCreateSettings();
             ShoulderUiTheme uiTheme = LoadOrCreateTheme();
-            ShoulderUiAtlasSetup.ConfigureTheme(uiTheme);
+            if (AssetDatabase.GetAssetPath(uiTheme) == ThemePath)
+                ShoulderUiAtlasSetup.ConfigureTheme(uiTheme);
             Material groundMaterial = LoadOrCreateMaterial("M_DemoGround", new Color(0.38f, 0.67f, 0.22f));
             Material accentMaterial = LoadOrCreateMaterial("M_DemoAccent", new Color(0.13f, 0.55f, 0.8f));
             Material obstacleMaterial = LoadOrCreateMaterial("M_DemoObstacle", new Color(0.48f, 0.27f, 0.13f));
@@ -639,12 +642,26 @@ namespace Railgame.Hansol.ShoulderView.Editor
 
         private static ShoulderUiTheme LoadOrCreateTheme()
         {
+            ShoulderUiTheme localTheme = AssetDatabase.LoadAssetAtPath<ShoulderUiTheme>(LocalTinySwordsThemePath);
+            if (localTheme != null && HasCommandLineFlag("-use-local-tiny-swords-theme"))
+            {
+                Debug.Log($"SHOULDER_VIEW_LOCAL_THEME_ACTIVE path={LocalTinySwordsThemePath}");
+                return localTheme;
+            }
             ShoulderUiTheme theme = AssetDatabase.LoadAssetAtPath<ShoulderUiTheme>(ThemePath);
             if (theme != null)
                 return theme;
             theme = ScriptableObject.CreateInstance<ShoulderUiTheme>();
             AssetDatabase.CreateAsset(theme, ThemePath);
             return theme;
+        }
+
+        private static bool HasCommandLineFlag(string flag)
+        {
+            foreach (string argument in System.Environment.GetCommandLineArgs())
+                if (string.Equals(argument, flag, System.StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
         }
 
         private static Material LoadOrCreateMaterial(string name, Color color)

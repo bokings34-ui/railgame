@@ -110,6 +110,12 @@ namespace Railgame.Hansol.ShoulderView
             currencyIconSprite = currencyIconValue;
         }
 
+        public void ConfigurePressedArtwork(Sprite primaryPressedValue, Sprite dangerPressedValue)
+        {
+            primaryButtonPressedSprite = primaryPressedValue;
+            dangerButtonPressedSprite = dangerPressedValue;
+        }
+
         public ColorBlock CreateSelectableColors(ShoulderUiRole role)
         {
             Color normal = GetColor(role);
