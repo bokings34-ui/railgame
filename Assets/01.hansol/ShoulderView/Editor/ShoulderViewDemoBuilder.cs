@@ -26,15 +26,16 @@ namespace Railgame.Hansol.ShoulderView.Editor
         {
             EnsureFolders();
             ShoulderViewSettings settings = LoadOrCreateSettings();
-            Material groundMaterial = LoadOrCreateMaterial("M_DemoGround", new Color(0.08f, 0.17f, 0.2f));
-            Material accentMaterial = LoadOrCreateMaterial("M_DemoAccent", new Color(0.1f, 0.73f, 0.78f));
-            Material obstacleMaterial = LoadOrCreateMaterial("M_DemoObstacle", new Color(0.93f, 0.4f, 0.2f));
-            Material playerMaterial = LoadOrCreateMaterial("M_DemoPlayer", new Color(0.65f, 0.95f, 0.42f));
-            Material terminalMaterial = LoadOrCreateMaterial("M_ShopTerminal", new Color(0.12f, 0.86f, 0.9f));
+            Material groundMaterial = LoadOrCreateMaterial("M_DemoGround", new Color(0.38f, 0.67f, 0.22f));
+            Material accentMaterial = LoadOrCreateMaterial("M_DemoAccent", new Color(0.13f, 0.55f, 0.8f));
+            Material obstacleMaterial = LoadOrCreateMaterial("M_DemoObstacle", new Color(0.48f, 0.27f, 0.13f));
+            Material leafMaterial = LoadOrCreateMaterial("M_DemoLeaves", new Color(0.18f, 0.48f, 0.15f));
+            Material playerMaterial = LoadOrCreateMaterial("M_DemoPlayer", new Color(0.95f, 0.48f, 0.27f));
+            Material terminalMaterial = LoadOrCreateMaterial("M_ShopTerminal", new Color(0.96f, 0.68f, 0.15f));
 
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             BuildLighting();
-            BuildEnvironment(groundMaterial, accentMaterial, obstacleMaterial);
+            BuildEnvironment(groundMaterial, accentMaterial, obstacleMaterial, leafMaterial);
 
             GameObject player = BuildPlayer(settings, playerMaterial);
             ShoulderCameraRig cameraRig = BuildCamera(player.transform, settings);
@@ -96,7 +97,7 @@ namespace Railgame.Hansol.ShoulderView.Editor
             lightObject.transform.rotation = Quaternion.Euler(48f, -32f, 0f);
         }
 
-        private static void BuildEnvironment(Material ground, Material accent, Material obstacle)
+        private static void BuildEnvironment(Material ground, Material accent, Material obstacle, Material leaves)
         {
             CreatePrimitive("Ground", PrimitiveType.Cube, new Vector3(0f, -0.5f, 4f),
                 new Vector3(32f, 1f, 36f), ground);
@@ -114,6 +115,21 @@ namespace Railgame.Hansol.ShoulderView.Editor
                 new Vector3(2.5f, 2f, 2.5f), obstacle);
             CreatePrimitive("CoverBlock_B", PrimitiveType.Cube, new Vector3(6.5f, 1.75f, 13f),
                 new Vector3(3f, 3.5f, 2f), accent);
+
+            Vector3[] treePositions =
+            {
+                new(-7f, 0f, -1f), new(-9f, 0f, 5f), new(8f, 0f, 2f),
+                new(10f, 0f, 9f), new(-8f, 0f, 13f), new(6f, 0f, 18f)
+            };
+            for (int index = 0; index < treePositions.Length; index++)
+            {
+                GameObject trunk = CreatePrimitive($"VoxelTree_{index:00}_Trunk", PrimitiveType.Cube,
+                    treePositions[index] + Vector3.up * 1.1f, new Vector3(0.55f, 2.2f, 0.55f), obstacle);
+                CreatePrimitive($"VoxelTree_{index:00}_Crown", PrimitiveType.Cube,
+                    trunk.transform.position + Vector3.up * 1.75f, new Vector3(2.2f, 1.6f, 2.2f), leaves);
+                CreatePrimitive($"VoxelTree_{index:00}_CrownTop", PrimitiveType.Cube,
+                    trunk.transform.position + Vector3.up * 2.65f, new Vector3(1.4f, 0.7f, 1.4f), leaves);
+            }
 
             for (int index = 0; index < 12; index++)
             {
@@ -188,6 +204,11 @@ namespace Railgame.Hansol.ShoulderView.Editor
                 FontStyle.Bold, Lime, TextAnchor.MiddleRight);
             SetRect(live.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-36f, -37f),
                 new Vector2(300f, 74f));
+            Text stationHud = CreateText("StationHUD", canvasObject.transform,
+                "STATION 04     ◆  BOLTS 07     NEXT LEG READY", font, 18, FontStyle.Bold, Cyan,
+                TextAnchor.MiddleCenter);
+            SetRect(stationHud.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0f, -37f), new Vector2(620f, 74f));
 
             Image panelImage = CreateImage("OptionsPanel", canvasObject.transform, Panel,
                 new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-32f, 0f), new Vector2(390f, 680f));
@@ -212,10 +233,11 @@ namespace Railgame.Hansol.ShoulderView.Editor
             Toggle invert = CreateToggleRow(panel, font, "INVERT VERTICAL LOOK", -380f);
 
             Text shoulderValue;
-            Button shoulder = CreateButtonRow(panel, font, "ACTIVE SHOULDER", "SWAP", -470f, out shoulderValue);
+            Button shoulder = CreateButtonRow(panel, font, "SHOULDER", "SWAP", -470f, out shoulderValue);
             Text unused;
-            Button reset = CreateButtonRow(panel, font, "RESTORE CAMERA", "RESET", -560f, out unused);
-            unused.text = "DEFAULTS";
+            Button reset = CreateButtonRow(panel, font, "CAMERA", "RESET", -560f, out unused);
+            shoulderValue.gameObject.SetActive(false);
+            unused.gameObject.SetActive(false);
 
             Text footer = CreateText("Footer", panel, "WASD MOVE   •   SHIFT SPRINT   •   SPACE JUMP", font, 13,
                 FontStyle.Normal, Muted, TextAnchor.MiddleCenter);
