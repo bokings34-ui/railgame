@@ -14,6 +14,9 @@ namespace Railgame.Hansol.ShoulderView.Editor
         private const string DemoRoot = "Assets/01.hansol/ShoulderView/Demo";
         private const string ScenePath = DemoRoot + "/ShoulderView_UI_Demo.unity";
         private const string SettingsPath = DemoRoot + "/ShoulderViewDemoSettings.asset";
+        private const string ThemePath = DemoRoot + "/ShoulderViewWorkshopTheme.asset";
+        private const string LocalTinySwordsThemePath =
+            "Assets/01.hansol/ShoulderView/UI/ThirdParty/TinySwordsLocal/ShoulderViewTinySwordsLocalTheme.asset";
 
         private static readonly Color Navy = new(0.035f, 0.055f, 0.09f, 0.96f);
         private static readonly Color Panel = new(0.055f, 0.085f, 0.13f, 0.95f);
@@ -26,6 +29,9 @@ namespace Railgame.Hansol.ShoulderView.Editor
         {
             EnsureFolders();
             ShoulderViewSettings settings = LoadOrCreateSettings();
+            ShoulderUiTheme uiTheme = LoadOrCreateTheme();
+            if (AssetDatabase.GetAssetPath(uiTheme) == ThemePath)
+                ShoulderUiAtlasSetup.ConfigureTheme(uiTheme);
             Material groundMaterial = LoadOrCreateMaterial("M_DemoGround", new Color(0.38f, 0.67f, 0.22f));
             Material accentMaterial = LoadOrCreateMaterial("M_DemoAccent", new Color(0.13f, 0.55f, 0.8f));
             Material obstacleMaterial = LoadOrCreateMaterial("M_DemoObstacle", new Color(0.48f, 0.27f, 0.13f));
@@ -35,13 +41,16 @@ namespace Railgame.Hansol.ShoulderView.Editor
 
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             BuildLighting();
+            ShoulderSeasonPreview seasonPreview =
+                new GameObject("SeasonPreview").AddComponent<ShoulderSeasonPreview>();
+            seasonPreview.Initialize(groundMaterial, accentMaterial, obstacleMaterial, leafMaterial);
             BuildEnvironment(groundMaterial, accentMaterial, obstacleMaterial, leafMaterial);
 
             GameObject player = BuildPlayer(settings, playerMaterial);
             ShoulderCameraRig cameraRig = BuildCamera(player.transform, settings);
             ShoulderLocomotionController locomotion = player.GetComponent<ShoulderLocomotionController>();
             locomotion.SetOrientationSource(cameraRig.transform);
-            InterfaceResult interfaceResult = BuildInterface(cameraRig, locomotion);
+            InterfaceResult interfaceResult = BuildInterface(cameraRig, locomotion, uiTheme);
             ShoulderInteractor interactor = BuildShopTerminal(player, cameraRig, interfaceResult, terminalMaterial);
 
             ShoulderViewEvidenceCapture evidence =
@@ -65,17 +74,36 @@ namespace Railgame.Hansol.ShoulderView.Editor
             string output = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Logs", "ShoulderEvidenceBuild",
                 "ShoulderShopEvidence.exe"));
             Directory.CreateDirectory(Path.GetDirectoryName(output));
-            BuildPlayerOptions options = new()
+            bool previousResizable = PlayerSettings.resizableWindow;
+            FullScreenMode previousFullScreenMode = PlayerSettings.fullScreenMode;
+            int previousWidth = PlayerSettings.defaultScreenWidth;
+            int previousHeight = PlayerSettings.defaultScreenHeight;
+            try
             {
-                scenes = new[] { ScenePath },
-                locationPathName = output,
-                target = BuildTarget.StandaloneWindows64,
-                options = BuildOptions.Development
-            };
-            UnityEditor.Build.Reporting.BuildReport report = BuildPipeline.BuildPlayer(options);
-            if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
-                throw new UnityEditor.Build.BuildFailedException($"Evidence player build failed: {report.summary.result}");
-            Debug.Log($"SHOULDER_VIEW_EVIDENCE_PLAYER_READY path={output}");
+                PlayerSettings.resizableWindow = true;
+                PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
+                PlayerSettings.defaultScreenWidth = 1920;
+                PlayerSettings.defaultScreenHeight = 1080;
+                BuildPlayerOptions options = new()
+                {
+                    scenes = new[] { ScenePath },
+                    locationPathName = output,
+                    target = BuildTarget.StandaloneWindows64,
+                    options = BuildOptions.Development
+                };
+                UnityEditor.Build.Reporting.BuildReport report = BuildPipeline.BuildPlayer(options);
+                if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
+                    throw new UnityEditor.Build.BuildFailedException(
+                        $"Evidence player build failed: {report.summary.result}");
+                Debug.Log($"SHOULDER_VIEW_EVIDENCE_PLAYER_READY path={output}");
+            }
+            finally
+            {
+                PlayerSettings.resizableWindow = previousResizable;
+                PlayerSettings.fullScreenMode = previousFullScreenMode;
+                PlayerSettings.defaultScreenWidth = previousWidth;
+                PlayerSettings.defaultScreenHeight = previousHeight;
+            }
         }
 
         private static void BuildLighting()
@@ -182,7 +210,7 @@ namespace Railgame.Hansol.ShoulderView.Editor
         }
 
         private static InterfaceResult BuildInterface(ShoulderCameraRig cameraRig,
-            ShoulderLocomotionController locomotion)
+            ShoulderLocomotionController locomotion, ShoulderUiTheme uiTheme)
         {
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             GameObject canvasObject = new("Shoulder View HUD");
@@ -194,34 +222,40 @@ namespace Railgame.Hansol.ShoulderView.Editor
             scaler.matchWidthOrHeight = 0.5f;
             canvasObject.AddComponent<GraphicRaycaster>();
 
-            CreateImage("TopBar", canvasObject.transform, Navy, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(0f, -74f), Vector2.zero);
+            Style(CreateImage("TopBar", canvasObject.transform, Navy, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(0f, -74f), Vector2.zero), ShoulderUiRole.HudBar);
             Text brand = CreateText("Brand", canvasObject.transform, "RAILGAME  /  SHOULDER PROTOTYPE", font, 25,
                 FontStyle.Bold, Color.white, TextAnchor.MiddleLeft);
             SetRect(brand.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(36f, -37f),
                 new Vector2(650f, 74f));
+            Style(brand, ShoulderUiRole.LightText);
             Text live = CreateText("LiveStatus", canvasObject.transform, "●  LIVE GAME VIEW", font, 20,
                 FontStyle.Bold, Lime, TextAnchor.MiddleRight);
             SetRect(live.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-36f, -37f),
                 new Vector2(300f, 74f));
+            Style(live, ShoulderUiRole.PositiveText);
             Text stationHud = CreateText("StationHUD", canvasObject.transform,
                 "STATION 04     ◆  BOLTS 07     NEXT LEG READY", font, 18, FontStyle.Bold, Cyan,
                 TextAnchor.MiddleCenter);
             SetRect(stationHud.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0f, -37f), new Vector2(620f, 74f));
+            Style(stationHud, ShoulderUiRole.AccentText);
 
             Image panelImage = CreateImage("OptionsPanel", canvasObject.transform, Panel,
                 new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-32f, 0f), new Vector2(390f, 680f));
+            Style(panelImage, ShoulderUiRole.Panel);
             Transform panel = panelImage.transform;
 
             Text title = CreateText("Title", panel, "SHOULDER VIEW", font, 30, FontStyle.Bold, Color.white,
                 TextAnchor.MiddleLeft);
             SetRect(title.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(24f, -52f),
                 new Vector2(-48f, 54f));
+            Style(title, ShoulderUiRole.LightText);
             Text subtitle = CreateText("Subtitle", panel, "REAL-TIME CAMERA OPTIONS", font, 15, FontStyle.Bold, Cyan,
                 TextAnchor.MiddleLeft);
             SetRect(subtitle.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(24f, -91f),
                 new Vector2(-48f, 28f));
+            Style(subtitle, ShoulderUiRole.AccentText);
 
             CreateDivider(panel, -120f);
             Text sensitivityValue;
@@ -243,6 +277,7 @@ namespace Railgame.Hansol.ShoulderView.Editor
                 FontStyle.Normal, Muted, TextAnchor.MiddleCenter);
             SetRect(footer.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(16f, 27f),
                 new Vector2(-32f, 34f));
+            Style(footer, ShoulderUiRole.SecondaryText);
 
             ShoulderViewOptionsPanel options = panelImage.gameObject.AddComponent<ShoulderViewOptionsPanel>();
             options.Initialize(cameraRig, sensitivity, fieldOfView, invert, shoulder, reset, sensitivityValue,
@@ -252,22 +287,29 @@ namespace Railgame.Hansol.ShoulderView.Editor
                 TextAnchor.MiddleCenter);
             SetRect(crosshair.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero,
                 new Vector2(42f, 42f));
+            Style(crosshair, ShoulderUiRole.LightText);
 
             Text proof = CreateText("Proof", canvasObject.transform,
                 "PERSPECTIVE  •  WORLD TARGETING  •  STATION SHOP", font, 16, FontStyle.Bold, Cyan,
                 TextAnchor.MiddleLeft);
             SetRect(proof.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(36f, 38f),
                 new Vector2(740f, 46f));
+            Style(proof, ShoulderUiRole.AccentText);
 
             Image promptBack = CreateImage("InteractionPrompt", canvasObject.transform, Navy,
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 86f), new Vector2(420f, 58f));
+            Style(promptBack, ShoulderUiRole.Prompt);
             Text prompt = CreateText("PromptText", promptBack.transform, string.Empty, font, 19, FontStyle.Bold,
                 Color.white, TextAnchor.MiddleCenter);
             SetRect(prompt.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Style(prompt, ShoulderUiRole.LightText);
 
             ShoulderShopEconomy economy = canvasObject.AddComponent<ShoulderShopEconomy>();
             economy.Initialize(7);
             ShoulderShopPanel shopPanel = BuildShopOverlay(canvasObject.transform, font, economy, cameraRig, locomotion);
+
+            ShoulderUiThemeController themeController = canvasObject.AddComponent<ShoulderUiThemeController>();
+            themeController.Initialize(uiTheme);
 
             GameObject eventSystem = new("EventSystem");
             eventSystem.AddComponent<EventSystem>();
@@ -280,28 +322,41 @@ namespace Railgame.Hansol.ShoulderView.Editor
         {
             Image overlay = CreateImage("StationShopOverlay", canvas, new Color(0.015f, 0.025f, 0.045f, 0.985f),
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Style(overlay, ShoulderUiRole.CanvasDimmer);
             Image header = CreateImage("ShopHeader", overlay.transform, Navy, new Vector2(0f, 1f), Vector2.one,
                 new Vector2(0f, -98f), new Vector2(0f, 196f));
+            Style(header, ShoulderUiRole.Header);
             Text station = CreateText("Station", header.transform, "STATION 04  /  UPGRADE DEPOT", font, 18,
                 FontStyle.Bold, Cyan, TextAnchor.MiddleLeft);
             SetRect(station.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(64f, -44f),
                 new Vector2(560f, 40f));
+            Style(station, ShoulderUiRole.AccentText);
             Text title = CreateText("ShopTitle", header.transform, "PREPARE THE NEXT LEG", font, 38,
                 FontStyle.Bold, Color.white, TextAnchor.MiddleLeft);
             SetRect(title.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(64f, -105f),
                 new Vector2(740f, 70f));
+            Style(title, ShoulderUiRole.LightText);
             Text bolts = CreateText("Bolts", header.transform, "BOLTS   07", font, 28, FontStyle.Bold, Lime,
                 TextAnchor.MiddleRight);
             SetRect(bolts.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-188f, -78f),
                 new Vector2(350f, 76f));
+            Style(bolts, ShoulderUiRole.PositiveText);
+            Image boltIcon = CreateImage("BoltIcon", header.transform, Color.white, new Vector2(1f, 1f),
+                new Vector2(1f, 1f), new Vector2(-388f, -78f), new Vector2(52f, 52f));
+            boltIcon.preserveAspect = true;
+            boltIcon.raycastTarget = false;
+            Style(boltIcon, ShoulderUiRole.CurrencyIcon);
 
             Image closeImage = CreateImage("Close", header.transform, new Color(0.16f, 0.22f, 0.3f, 1f),
                 new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-54f, -78f), new Vector2(84f, 60f));
             Button close = closeImage.gameObject.AddComponent<Button>();
             close.targetGraphic = closeImage;
+            Style(closeImage, ShoulderUiRole.DangerButton);
+            closeImage.gameObject.AddComponent<ShoulderUiFocusFeedback>();
             Text closeText = CreateText("Text", closeImage.transform, "X", font, 24, FontStyle.Bold, Color.white,
                 TextAnchor.MiddleCenter);
             SetRect(closeText.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Style(closeText, ShoulderUiRole.LightText);
 
             ShoulderShopOffer[] offers =
             {
@@ -319,11 +374,13 @@ namespace Railgame.Hansol.ShoulderView.Editor
                 18, FontStyle.Bold, Muted, TextAnchor.MiddleCenter);
             SetRect(feedback.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 52f),
                 new Vector2(920f, 46f));
+            Style(feedback, ShoulderUiRole.SecondaryText);
             Text source = CreateText("DesignNote", overlay.transform,
                 "STATION CONTEXT  •  3 CLEAR OFFERS  •  COST + STAT DELTA  •  IMMEDIATE PROTOTYPE EFFECT", font,
                 13, FontStyle.Normal, Cyan, TextAnchor.MiddleCenter);
             SetRect(source.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 18f),
                 new Vector2(1000f, 30f));
+            Style(source, ShoulderUiRole.AccentText);
 
             ShoulderShopPanel panel = overlay.gameObject.AddComponent<ShoulderShopPanel>();
             panel.Initialize(overlay.gameObject, bolts, feedback, close, views, economy, offers, cameraRig, locomotion);
@@ -335,39 +392,50 @@ namespace Railgame.Hansol.ShoulderView.Editor
         {
             Image card = CreateImage($"Offer_{sequence:00}", parent, Panel, new Vector2(anchorX, 0.5f),
                 new Vector2(anchorX, 0.5f), new Vector2(0f, -20f), new Vector2(510f, 620f));
+            Style(card, ShoulderUiRole.Card);
             Image number = CreateImage("Number", card.transform, Cyan, new Vector2(0f, 1f), new Vector2(0f, 1f),
                 new Vector2(28f, -34f), new Vector2(52f, 52f));
+            Style(number, ShoulderUiRole.FocusBadge);
             Text numberText = CreateText("Text", number.transform, sequence.ToString("00"), font, 17,
                 FontStyle.Bold, Navy, TextAnchor.MiddleCenter);
             SetRect(numberText.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Style(numberText, ShoulderUiRole.PrimaryText);
 
             Text tier = CreateText("Tier", card.transform, string.Empty, font, 15, FontStyle.Bold, Muted,
                 TextAnchor.MiddleRight);
             SetRect(tier.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-26f, -34f),
                 new Vector2(190f, 40f));
+            Style(tier, ShoulderUiRole.PrimaryText);
             Text title = CreateText("Title", card.transform, string.Empty, font, 29, FontStyle.Bold, Color.white,
                 TextAnchor.MiddleLeft);
             SetRect(title.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(28f, -112f),
                 new Vector2(-56f, 54f));
+            Style(title, ShoulderUiRole.PrimaryText);
             Text description = CreateText("Description", card.transform, string.Empty, font, 17, FontStyle.Normal,
                 Muted, TextAnchor.UpperLeft);
             description.horizontalOverflow = HorizontalWrapMode.Wrap;
             SetRect(description.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(28f, -182f),
                 new Vector2(-56f, 90f));
+            Style(description, ShoulderUiRole.PrimaryText);
 
             Image statBack = CreateImage("StatBack", card.transform, new Color(0.035f, 0.13f, 0.17f, 1f),
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 4f), new Vector2(450f, 160f));
+            Style(statBack, ShoulderUiRole.Inset);
             Text stat = CreateText("Stat", statBack.transform, string.Empty, font, 22, FontStyle.Bold, Cyan,
                 TextAnchor.MiddleCenter);
             SetRect(stat.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Style(stat, ShoulderUiRole.AccentText);
 
             Image buyImage = CreateImage("Buy", card.transform, new Color(0.13f, 0.62f, 0.5f, 1f),
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 54f), new Vector2(450f, 76f));
             Button buy = buyImage.gameObject.AddComponent<Button>();
             buy.targetGraphic = buyImage;
+            Style(buyImage, ShoulderUiRole.PrimaryButton);
+            buyImage.gameObject.AddComponent<ShoulderUiFocusFeedback>();
             Text cost = CreateText("Cost", buyImage.transform, string.Empty, font, 19, FontStyle.Bold, Color.white,
                 TextAnchor.MiddleCenter);
             SetRect(cost.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Style(cost, ShoulderUiRole.LightText);
             return new ShoulderShopPanel.OfferView
             {
                 title = title, description = description, tier = tier, stat = stat, cost = cost, buyButton = buy
@@ -414,10 +482,12 @@ namespace Railgame.Hansol.ShoulderView.Editor
                 TextAnchor.MiddleLeft);
             SetRect(labelText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(24f, y),
                 new Vector2(-140f, 32f));
+            Style(labelText, ShoulderUiRole.LightText);
             valueText = CreateText(label + " Value", parent, string.Empty, font, 17, FontStyle.Bold, Cyan,
                 TextAnchor.MiddleRight);
             SetRect(valueText.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-24f, y),
                 new Vector2(100f, 32f));
+            Style(valueText, ShoulderUiRole.AccentText);
 
             GameObject sliderObject = new(label + " Slider", typeof(RectTransform));
             sliderObject.transform.SetParent(parent, false);
@@ -431,14 +501,17 @@ namespace Railgame.Hansol.ShoulderView.Editor
 
             Image background = CreateImage("Background", sliderObject.transform, new Color(0.12f, 0.18f, 0.24f, 1f),
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Style(background, ShoulderUiRole.Inset);
             background.rectTransform.offsetMin = new Vector2(0f, 8f);
             background.rectTransform.offsetMax = new Vector2(0f, -8f);
             Image fill = CreateImage("Fill", sliderObject.transform, Cyan, Vector2.zero, new Vector2(0.7f, 1f),
                 Vector2.zero, Vector2.zero);
+            Style(fill, ShoulderUiRole.FocusBadge);
             fill.rectTransform.offsetMin = new Vector2(0f, 8f);
             fill.rectTransform.offsetMax = new Vector2(0f, -8f);
             Image handle = CreateImage("Handle", sliderObject.transform, Color.white, new Vector2(0.7f, 0.5f),
                 new Vector2(0.7f, 0.5f), Vector2.zero, new Vector2(18f, 32f));
+            Style(handle, ShoulderUiRole.LightText);
             slider.fillRect = fill.rectTransform;
             slider.handleRect = handle.rectTransform;
             slider.targetGraphic = handle;
@@ -451,11 +524,14 @@ namespace Railgame.Hansol.ShoulderView.Editor
                 TextAnchor.MiddleLeft);
             SetRect(labelText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(24f, y),
                 new Vector2(-90f, 42f));
+            Style(labelText, ShoulderUiRole.LightText);
             Image background = CreateImage(label + " Toggle", parent, new Color(0.12f, 0.18f, 0.24f, 1f),
                 new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-38f, y), new Vector2(48f, 30f));
+            Style(background, ShoulderUiRole.Inset);
             Toggle toggle = background.gameObject.AddComponent<Toggle>();
             Image check = CreateImage("Checkmark", background.transform, Lime, new Vector2(0.5f, 0.5f),
                 new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(34f, 18f));
+            Style(check, ShoulderUiRole.PositiveText);
             toggle.targetGraphic = background;
             toggle.graphic = check;
             toggle.isOn = false;
@@ -469,17 +545,22 @@ namespace Railgame.Hansol.ShoulderView.Editor
                 TextAnchor.MiddleLeft);
             SetRect(labelText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(24f, y),
                 new Vector2(-190f, 44f));
+            Style(labelText, ShoulderUiRole.LightText);
             valueText = CreateText(label + " Value", parent, string.Empty, font, 15, FontStyle.Bold, Cyan,
                 TextAnchor.MiddleRight);
             SetRect(valueText.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-128f, y),
                 new Vector2(90f, 44f));
+            Style(valueText, ShoulderUiRole.AccentText);
             Image buttonImage = CreateImage(label + " Button", parent, new Color(0.1f, 0.55f, 0.62f, 1f),
                 new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-24f, y), new Vector2(88f, 40f));
             Button button = buttonImage.gameObject.AddComponent<Button>();
             button.targetGraphic = buttonImage;
+            Style(buttonImage, ShoulderUiRole.PrimaryButton);
+            buttonImage.gameObject.AddComponent<ShoulderUiFocusFeedback>();
             Text text = CreateText("Text", buttonImage.transform, buttonText, font, 14, FontStyle.Bold, Color.white,
                 TextAnchor.MiddleCenter);
             SetRect(text.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Style(text, ShoulderUiRole.LightText);
             return button;
         }
 
@@ -487,6 +568,7 @@ namespace Railgame.Hansol.ShoulderView.Editor
         {
             Image divider = CreateImage("Divider", parent, new Color(Cyan.r, Cyan.g, Cyan.b, 0.35f),
                 new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(24f, y), new Vector2(-48f, 2f));
+            Style(divider, ShoulderUiRole.Divider);
             divider.raycastTarget = false;
         }
 
@@ -529,6 +611,15 @@ namespace Railgame.Hansol.ShoulderView.Editor
             return text;
         }
 
+        private static T Style<T>(T graphic, ShoulderUiRole role) where T : Graphic
+        {
+            ShoulderUiSkinElement skin = graphic.GetComponent<ShoulderUiSkinElement>();
+            if (skin == null)
+                skin = graphic.gameObject.AddComponent<ShoulderUiSkinElement>();
+            skin.Initialize(role);
+            return graphic;
+        }
+
         private static void SetRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax,
             Vector2 anchoredPosition, Vector2 sizeDelta)
         {
@@ -547,6 +638,30 @@ namespace Railgame.Hansol.ShoulderView.Editor
             settings = ScriptableObject.CreateInstance<ShoulderViewSettings>();
             AssetDatabase.CreateAsset(settings, SettingsPath);
             return settings;
+        }
+
+        private static ShoulderUiTheme LoadOrCreateTheme()
+        {
+            ShoulderUiTheme localTheme = AssetDatabase.LoadAssetAtPath<ShoulderUiTheme>(LocalTinySwordsThemePath);
+            if (localTheme != null && HasCommandLineFlag("-use-local-tiny-swords-theme"))
+            {
+                Debug.Log($"SHOULDER_VIEW_LOCAL_THEME_ACTIVE path={LocalTinySwordsThemePath}");
+                return localTheme;
+            }
+            ShoulderUiTheme theme = AssetDatabase.LoadAssetAtPath<ShoulderUiTheme>(ThemePath);
+            if (theme != null)
+                return theme;
+            theme = ScriptableObject.CreateInstance<ShoulderUiTheme>();
+            AssetDatabase.CreateAsset(theme, ThemePath);
+            return theme;
+        }
+
+        private static bool HasCommandLineFlag(string flag)
+        {
+            foreach (string argument in System.Environment.GetCommandLineArgs())
+                if (string.Equals(argument, flag, System.StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
         }
 
         private static Material LoadOrCreateMaterial(string name, Color color)

@@ -32,3 +32,18 @@
 - 공용 봄·여름 맵과 생성기는 수정하지 않았다.
 - 박한솔 전용 상점 데모에 밝은 잔디·물·흙 팔레트, 블록형 나무 군집, 볼트 HUD를 반영했다.
 - 상점 카드에는 통화, 3개 제안, 비용, 현재/다음 수치, 구매 후 피드백을 유지했다.
+
+## 새 UI 재검증 절차
+
+- 독립 데모 실행 인자 `-evidence-season Spring|Summer`로 동일한 카메라와 UI에서 팔레트만 교체한다.
+- 계절 전환은 `ShoulderSeasonPreview` 컴포넌트 하나에 격리되어 팀 맵이나 공용 생성기를 수정하지 않는다.
+- 결과 파일은 `ShoulderView_*_Spring_Evidence.png`와 `ShoulderView_*_Summer_Evidence.png`로 분리한다.
+- 월드 HUD, 상점 열림, 구매 후 상태를 각 계절에서 모두 캡처해 배경 대비와 상호작용 상태를 함께 확인한다.
+
+## 새 UI 재검증 결과
+
+- 봄: `Logs/ShoulderView_World_Evidence_Spring.png`, `Logs/ShoulderView_Shop_Open_Evidence_Spring.png`, `Logs/ShoulderView_Shop_Purchased_Evidence_Spring.png`
+- 여름: `Logs/ShoulderView_World_Evidence_Summer.png`, `Logs/ShoulderView_Shop_Open_Evidence_Summer.png`, `Logs/ShoulderView_Shop_Purchased_Evidence_Summer.png`
+- 두 계절 모두 상점 열기와 첫 업그레이드 구매가 성공했으며 플레이어 로그에 `opened=True`, `purchased=True`가 기록됐다.
+- 봄의 밝은 녹지와 여름의 짙은 녹지 양쪽에서 네이비 HUD, 양피지 카드, 청록 버튼의 계층과 텍스트 대비가 유지됐다.
+- 실행 세션의 창 크기 제한으로 실제 캡처는 `1024x720`이다. 요청 해상도 `1280x720`과 별개로 증거 크기를 과장하지 않는다.
