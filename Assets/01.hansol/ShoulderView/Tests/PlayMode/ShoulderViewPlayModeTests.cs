@@ -113,10 +113,79 @@ namespace Railgame.Hansol.ShoulderView.Tests
             Assert.That(maximumY, Is.GreaterThan(jumpStartY + 0.8f));
         }
 
+        [UnityTest]
+        public IEnumerator InteractorTargetsCameraCenterAndInvokesWorldTerminal()
+        {
+            GameObject cameraObject = Track(new GameObject("InteractionCamera"));
+            Camera camera = cameraObject.AddComponent<Camera>();
+            cameraObject.transform.position = new Vector3(0f, 1f, -4f);
+            cameraObject.transform.rotation = Quaternion.identity;
+
+            GameObject player = Track(new GameObject("InteractorOwner"));
+            ShoulderInteractor interactor = player.AddComponent<ShoulderInteractor>();
+            interactor.Initialize(camera, null, 8f);
+
+            GameObject target = Track(GameObject.CreatePrimitive(PrimitiveType.Cube));
+            target.name = "WorldShopTerminal";
+            target.transform.position = new Vector3(0f, 1f, 2f);
+            TestInteractable interactable = target.AddComponent<TestInteractable>();
+            Physics.SyncTransforms();
+            yield return null;
+
+            Assert.That(interactor.ScanForTarget(), Is.SameAs(interactable));
+            Assert.That(interactor.TryInteract(), Is.True);
+            Assert.That(interactable.InteractionCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ShopUpgradeSpendsBoltsAndIncreasesTierAndStat()
+        {
+            GameObject economyObject = Track(new GameObject("ShopEconomy"));
+            ShoulderShopEconomy economy = economyObject.AddComponent<ShoulderShopEconomy>();
+            economy.Initialize(7);
+            ShoulderShopOffer offer = new("CARGO RACK", "Capacity prototype", "CAPACITY", 6f, 2f, 2);
+
+            Assert.That(offer.TryUpgrade(economy), Is.True);
+            Assert.That(economy.Bolts, Is.EqualTo(5));
+            Assert.That(offer.Tier, Is.EqualTo(1));
+            Assert.That(offer.CurrentValue, Is.EqualTo(8f));
+            Assert.That(offer.CurrentCost, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void CameraOptionsApplyRuntimeValues()
+        {
+            GameObject cameraObject = Track(new GameObject("OptionsCamera"));
+            Camera camera = cameraObject.AddComponent<Camera>();
+            ShoulderCameraRig rig = cameraObject.AddComponent<ShoulderCameraRig>();
+
+            rig.SetLookSensitivityMultiplier(2f);
+            rig.SetFieldOfView(78f);
+            rig.SetInvertVerticalLook(true);
+            rig.SetRightShoulder(false);
+
+            Assert.That(rig.LookSensitivityMultiplier, Is.EqualTo(2f));
+            Assert.That(camera.fieldOfView, Is.EqualTo(78f).Within(0.01f));
+            Assert.That(rig.InvertVerticalLook, Is.True);
+            Assert.That(rig.IsRightShoulder, Is.False);
+        }
+
         private T Track<T>(T item) where T : Object
         {
             cleanup.Add(item);
             return item;
+        }
+    }
+
+    public sealed class TestInteractable : MonoBehaviour, IShoulderInteractable
+    {
+        public string InteractionPrompt => "OPEN TEST SHOP";
+        public bool CanInteract => true;
+        public int InteractionCount { get; private set; }
+
+        public void Interact(ShoulderInteractor interactor)
+        {
+            InteractionCount++;
         }
     }
 }

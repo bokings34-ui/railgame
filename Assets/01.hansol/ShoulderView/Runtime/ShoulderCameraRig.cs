@@ -14,12 +14,18 @@ namespace Railgame.Hansol.ShoulderView
         private float yaw;
         private float pitch;
         private float shoulderSign = 1f;
+        private float lookSensitivityMultiplier = 1f;
+        private float fieldOfViewOverride = -1f;
+        private bool invertVerticalLook;
         private bool ownsSettings;
 
         public Transform Target => target;
         public float Yaw => yaw;
         public float Pitch => pitch;
         public bool IsRightShoulder => shoulderSign > 0f;
+        public float LookSensitivityMultiplier => lookSensitivityMultiplier;
+        public float EffectiveFieldOfView => fieldOfViewOverride > 0f ? fieldOfViewOverride : settings.FieldOfView;
+        public bool InvertVerticalLook => invertVerticalLook;
 
         private void Awake()
         {
@@ -74,7 +80,10 @@ namespace Railgame.Hansol.ShoulderView
         public void AddLookInput(Vector2 mouseDelta)
         {
             EnsureSettings();
-            AddLookDegrees(mouseDelta * settings.LookSensitivity);
+            Vector2 scaled = mouseDelta * (settings.LookSensitivity * lookSensitivityMultiplier);
+            if (invertVerticalLook)
+                scaled.y *= -1f;
+            AddLookDegrees(scaled);
         }
 
         public void AddLookDegrees(Vector2 degrees)
@@ -87,6 +96,33 @@ namespace Railgame.Hansol.ShoulderView
         public void SwapShoulder()
         {
             shoulderSign *= -1f;
+        }
+
+        public void SetRightShoulder(bool value)
+        {
+            shoulderSign = value ? 1f : -1f;
+        }
+
+        public void SetLookSensitivityMultiplier(float value)
+        {
+            lookSensitivityMultiplier = Mathf.Clamp(value, 0.25f, 3f);
+        }
+
+        public void SetFieldOfView(float value)
+        {
+            fieldOfViewOverride = Mathf.Clamp(value, 40f, 90f);
+            ApplyProjection();
+        }
+
+        public void ClearFieldOfViewOverride()
+        {
+            fieldOfViewOverride = -1f;
+            ApplyProjection();
+        }
+
+        public void SetInvertVerticalLook(bool value)
+        {
+            invertVerticalLook = value;
         }
 
         public void SnapToTarget()
@@ -155,7 +191,7 @@ namespace Railgame.Hansol.ShoulderView
             if (view == null)
                 view = GetComponent<Camera>();
             view.orthographic = false;
-            view.fieldOfView = settings.FieldOfView;
+            view.fieldOfView = EffectiveFieldOfView;
         }
 
         private void EnsureSettings()
