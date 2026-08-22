@@ -46,5 +46,4 @@ Jira: SBSL-8
 ## 연동
 
 - Jira: <https://hansola1234.atlassian.net/browse/SBSL-8>
-- GitHub PR: 병합 절차에서 확정 후 기록
-
+- GitHub PR: <https://github.com/park12347789/railgame/pull/3>
