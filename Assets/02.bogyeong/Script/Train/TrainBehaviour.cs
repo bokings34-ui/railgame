@@ -49,6 +49,9 @@ public class TrainBehaviour : MonoBehaviour
     [SerializeField] private TrainPhase trainPhase = TrainPhase.Idle;
     [SerializeField] private TrainDirection trainDirection = TrainDirection.Forward;
 
+    // 경로(레일). 할당되면 forward+turn 대신 이 경로를 추종한다.
+    [SerializeField] private RailPath railPath;
+
     [SerializeField] private TMPro.TextMeshProUGUI countDownText;
 
     // 피드백 신호(옵저버). 컨트롤러/타 시스템이 폴링 없이 상태를 동기화한다.
@@ -68,6 +71,10 @@ public class TrainBehaviour : MonoBehaviour
 
     private Vector3 moveForward;
     private int _countDown = 5;
+
+    // 경로 추종 상태. _tileProgress는 타일 단위(타일당 길이 1 = 등시간).
+    private float _tileProgress;
+    private int _lastTileIndex = -1;
 
     // 엔진(리드)의 이동 경로 기록. index 0이 가장 최근 지점.
     private readonly List<Pose> _pathHistory = new List<Pose>();
@@ -104,7 +111,26 @@ public class TrainBehaviour : MonoBehaviour
             section.Initialize(this);
         }
 
+        SnapEngineToRailStart();
         SeedPathHistory();
+    }
+
+    // railPath가 할당되면 엔진을 경로 시작 지점에 배치한다(경로기록 시드 이전에 호출).
+    private void SnapEngineToRailStart()
+    {
+        if (railPath == null || engineRoom == null) return;
+
+        _tileProgress = 0f;
+        _lastTileIndex = -1;
+
+        Pose start = railPath.Evaluate(0f);
+        if (_engineBody != null)
+        {
+            _engineBody.position = start.position;
+            _engineBody.rotation = start.rotation;
+        }
+        engineRoom.position = start.position;
+        engineRoom.rotation = start.rotation;
     }
 
     // 엔진 섹션을 배열 맨 앞(index 0)으로 옮긴다. 나머지 순서는 유지.
@@ -145,7 +171,7 @@ public class TrainBehaviour : MonoBehaviour
         body.interpolation = RigidbodyInterpolation.Interpolate;
     }
 
-    // 시작 시 엔진 뒤로 직선 경로를 미리 채워 뒤 차량이 곧바로 일정 간격으로 정렬되게 한다.
+    // 생성 직후 차량 간격을 즉시 배치하고, 엔진 뒤로 직선 경로를 미리 채운다.
     private void SeedPathHistory()
     {
         if (engineRoom == null) return;
@@ -163,7 +189,29 @@ public class TrainBehaviour : MonoBehaviour
         _pathHistory.Add(new Pose(
             engineRoom.position - engineRoom.forward * _maxPathDistance, engineRoom.rotation));
 
-        UpdateFollowers(true);
+        ArrangeSections();
+    }
+
+    // 각 뒤 차량을 엔진 뒤로 carSpacing 간격만큼 즉시 배치(스냅)한다.
+    // 생성 직후 호출되며, 스폰 후 열차를 재배치했다면 다시 호출할 수 있다.
+    public void ArrangeSections()
+    {
+        if (engineRoom == null) return;
+
+        Vector3 enginePos = engineRoom.position;
+        Quaternion engineRot = engineRoom.rotation;
+        Vector3 back = -engineRoom.forward;
+
+        int carIndex = 0;
+        for (int i = 0; i < trainSections.Length; i++)
+        {
+            TrainSection section = trainSections[i];
+            if (section.transform == engineRoom) continue;
+
+            carIndex++;
+            section.transform.SetPositionAndRotation(
+                enginePos + back * (carSpacing * carIndex), engineRot);
+        }
     }
 
     private void FixedUpdate()
@@ -185,6 +233,13 @@ public class TrainBehaviour : MonoBehaviour
     // 엔진을 Kinematic Rigidbody로 이동/회전시키고, 그 목표 Pose를 경로에 기록한다.
     private void MoveEngine()
     {
+        // railPath가 있으면 경로 추종, 없으면 기존 forward+turn 폴백.
+        if (railPath != null)
+        {
+            MoveEngineAlongRail();
+            return;
+        }
+
         Vector3 currentPos = _engineBody != null ? _engineBody.position : engineRoom.position;
         Quaternion currentRot = _engineBody != null ? _engineBody.rotation : engineRoom.rotation;
 
@@ -222,6 +277,52 @@ public class TrainBehaviour : MonoBehaviour
         }
 
         RecordEnginePose(nextPos, nextRot);
+    }
+
+    // 레일 경로를 타일 단위로 추종한다. speed = 타일/초 → 타일당 등시간(직선=곡선).
+    private void MoveEngineAlongRail()
+    {
+        int tileCount = railPath.TileCount;
+        if (tileCount == 0) return;
+
+        _tileProgress += speed * Time.fixedDeltaTime;
+
+        // 밟은 타일 영구 고정.
+        int idx = Mathf.FloorToInt(_tileProgress);
+        if (idx > _lastTileIndex)
+        {
+            railPath.LockUpTo(Mathf.Min(idx, tileCount - 1));
+            _lastTileIndex = idx;
+        }
+
+        // 끝(마지막 타일의 진출점) 도달 → 정지.
+        if (_tileProgress >= tileCount)
+        {
+            _tileProgress = tileCount;
+            Pose endPose = railPath.Evaluate(_tileProgress);
+            ApplyEnginePose(endPose);
+            RecordEnginePose(endPose.position, endPose.rotation);
+            SetPhase(TrainPhase.End);
+            return;
+        }
+
+        Pose pose = railPath.Evaluate(_tileProgress);
+        ApplyEnginePose(pose);
+        RecordEnginePose(pose.position, pose.rotation);
+    }
+
+    private void ApplyEnginePose(Pose pose)
+    {
+        if (_engineBody != null)
+        {
+            _engineBody.MovePosition(pose.position);
+            _engineBody.MoveRotation(pose.rotation);
+        }
+        else
+        {
+            engineRoom.position = pose.position;
+            engineRoom.rotation = pose.rotation;
+        }
     }
 
     // 엔진 목표 Pose를 경로 기록 맨 앞에 추가하고 오래된 기록을 잘라낸다.
