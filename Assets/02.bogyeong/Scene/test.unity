@@ -155,12 +155,18 @@ MonoBehaviour:
   - {fileID: 1485981555}
   engineRoom: {fileID: 828480542}
   speed: 1
-  maxSpeed: 5
+  maxSpeed: 10
+  accelRate: 2
   onceMoveRange: 1
   carSpacing: 2.5
   trainPhase: 0
   trainDirection: 0
   railPath: {fileID: 521751997}
+  goalDashMultiplier: 5
+  explosionPrefab: {fileID: 0}
+  heatMax: 100
+  heatRisePerSec: 5
+  coolEnabledAboveRatio: 0.5
   countDownText: {fileID: 1957752870}
 --- !u!4 &479582985
 Transform:
@@ -211,6 +217,7 @@ MonoBehaviour:
   railHeight: 0
   startBlock: {fileID: 951375172}
   startDir: 0
+  goalBlock: {fileID: 2024667393}
   blockPrefab: {fileID: 5545302187196012592, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
 --- !u!4 &521751998
 Transform:
@@ -545,6 +552,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6ec9f38b2d0ccb742aac24b7b6157681, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EngineSection
+  fireThresholdRatio: 1
+  fireCalmRatio: 0.5
+  durabilityMax: 100
+  fireDamagePerSec: 25
+  regenDelay: 2
+  regenPerSec: 15
 --- !u!1 &907101700
 GameObject:
   m_ObjectHideFlags: 0
@@ -631,8 +644,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 907101700}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.34260097, y: 0.6326601, z: -0.36798134, w: -0.5890293}
-  m_LocalPosition: {x: 5.2670646, y: 11.668354, z: 2.950872}
+  m_LocalRotation: {x: -0.38838848, y: 0.5941944, z: -0.39639938, w: -0.5821984}
+  m_LocalPosition: {x: 9.270524, y: 31.503735, z: 13.161638}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -994,6 +1007,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 607029550b61f1c4fa2ba91b72674ddb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WaterTankSection
+  coolPerSecond: 20
 --- !u!1 &1606009894
 GameObject:
   m_ObjectHideFlags: 0
@@ -1680,6 +1694,63 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f47682f3e360e7b4a9b9df03855b4894, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CargoSection
+--- !u!1001 &1897981023
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 7115527842919681711, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7115527842919681711, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7115527842919681711, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 7115527842919681711, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7115527842919681711, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7115527842919681711, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7115527842919681711, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7115527842919681711, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7115527842919681711, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7115527842919681711, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8900714640302693631, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+      propertyPath: m_Name
+      value: Rail (2)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
 --- !u!1 &1957752868
 GameObject:
   m_ObjectHideFlags: 0
@@ -1874,6 +1945,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+--- !u!114 &2024667393 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5545302187196012592, guid: 0ffa368de936ddf498b24c82ad6b23b0, type: 3}
+  m_PrefabInstance: {fileID: 1897981023}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c889a0dbaa223d47a67aa9a9ab2bfe0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RailBlock
 --- !u!1 &2121191839
 GameObject:
   m_ObjectHideFlags: 0
@@ -2097,6 +2179,7 @@ SceneRoots:
   - {fileID: 697278975}
   - {fileID: 521751998}
   - {fileID: 1824968822295443082}
+  - {fileID: 1897981023}
   - {fileID: 2003342026}
   - {fileID: 640659460}
   - {fileID: 1710763038}

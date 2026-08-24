@@ -29,6 +29,13 @@ public enum TrainDirection
     Right,
 }
 
+// 실패 사유. 연출 분기(급정차 등)와 게임 흐름 전파에 쓰인다.
+public enum FailReason
+{
+    DeadEnd,          // 트랙 소진(막다른 길) → 급정차 + 폭발
+    EngineDestroyed,  // 과열 화재로 엔진 내구도 0 → 폭발(운행 중 추가 연출 고려중)
+}
+
 public struct TrainData
 {
     public float speed;
@@ -41,8 +48,10 @@ public class TrainBehaviour : MonoBehaviour
     [SerializeField] private TrainSection[] trainSections;
 
     [SerializeField] private Transform engineRoom;
-    [SerializeField] private float speed = 0.1f;
+    [SerializeField] private float speed = 1f;
     [SerializeField] private float maxSpeed = 1f;
+    [Tooltip("출발/정지 시 속도 변화율(타일/초²). 클수록 빠르게 가감속.")]
+    [SerializeField] private float accelRate = 2f;
     [SerializeField] private float onceMoveRange = 1f;
     [SerializeField] private float carSpacing = 1f;
 
@@ -51,6 +60,18 @@ public class TrainBehaviour : MonoBehaviour
 
     // 경로(레일). 할당되면 forward+turn 대신 이 경로를 추종한다.
     [SerializeField] private RailPath railPath;
+    [Tooltip("종착점 연결 시 현재 속도에 곱해지는 대시 배수(예: 3 = 3배 가속).")]
+    [SerializeField] private float goalDashMultiplier = 3f;
+    [Tooltip("실패 시 엔진 위치에 생성할 폭발 이펙트(선택).")]
+    [SerializeField] private GameObject explosionPrefab;
+
+    [Header("과열(엔진·물탱크 공유)")]
+    [SerializeField] private float heatMax = 100f;
+    [Tooltip("진행 시간에 비례한 초당 과열 상승량.")]
+    [SerializeField] private float heatRisePerSec = 5f;
+    [Tooltip("이 비율 이상일 때만 냉각이 가능하다(뜨거울 때만 식힐 수 있음).")]
+    [Range(0f, 1f)]
+    [SerializeField] private float coolEnabledAboveRatio = 0.5f;
 
     [SerializeField] private TMPro.TextMeshProUGUI countDownText;
 
@@ -59,7 +80,29 @@ public class TrainBehaviour : MonoBehaviour
     public event System.Action<TrainPhase> OnPhaseChanged;
     public event System.Action<TrainData> OnTrainState;
 
+    // 스테이지 클리어 신호. 종착점에 도착하면 1회 발행한다.
+    public event System.Action OnStageClear;
+
+    // 스테이지 실패 신호(사유 포함). 트랙 소진 또는 엔진 내구도 0에서 1회 발행한다.
+    public event System.Action<FailReason> OnStageFail;
+
     public TrainPhase Phase => trainPhase;
+
+    // 서브시스템(엔진 과열 등)이 조회하는 이동 상태.
+    public bool IsMoving => trainPhase == TrainPhase.Progress;
+    public float CurrentSpeed => _currentSpeed;
+
+    // 과열 게이지(엔진·물탱크가 동일하게 관측). 진행 시간에 비례해 상승.
+    public float HeatRatio => heatMax > 0f ? _heat / heatMax : 0f;
+    // 냉각 가능 여부: 게이지가 임계 비율 이상(뜨거울 때)일 때만 냉각이 통한다.
+    public bool CanCool => HeatRatio >= coolEnabledAboveRatio;
+
+    // 냉각(물탱크/입력이 호출). 임계 이상에서만 실제로 낮아진다.
+    public void Cool(float amount)
+    {
+        if (!CanCool) return;
+        _heat = Mathf.Max(0f, _heat - Mathf.Abs(amount));
+    }
 
     // 현재 이동 상태 스냅샷. 동기화·타 클래스 조회의 표준 형태.
     public TrainData CurrentState => new TrainData
@@ -75,6 +118,16 @@ public class TrainBehaviour : MonoBehaviour
     // 경로 추종 상태. _tileProgress는 타일 단위(타일당 길이 1 = 등시간).
     private float _tileProgress;
     private int _lastTileIndex = -1;
+    private bool _goalDashApplied;
+
+    // 부드러운 속도 변화용. _currentSpeed가 목표 속도로 서서히 수렴한다.
+    private float _currentSpeed;
+    private bool _stopRequested;
+    private bool _failed;
+
+    // 공유 과열 수치.
+    private float _heat;
+    private bool _prevCanCool; // 냉각 가능 구간 진입/이탈 로그용(임시)
 
     // 엔진(리드)의 이동 경로 기록. index 0이 가장 최근 지점.
     private readonly List<Pose> _pathHistory = new List<Pose>();
@@ -122,6 +175,12 @@ public class TrainBehaviour : MonoBehaviour
 
         _tileProgress = 0f;
         _lastTileIndex = -1;
+        _goalDashApplied = false;
+        _currentSpeed = 0f;
+        _stopRequested = false;
+        _failed = false;
+        _heat = 0f;
+        _prevCanCool = false;
 
         Pose start = railPath.Evaluate(0f);
         if (_engineBody != null)
@@ -216,6 +275,9 @@ public class TrainBehaviour : MonoBehaviour
 
     private void FixedUpdate()
     {
+        // 페이즈별 과열 처리(Progress 누적 / Idle 초기화 / 그 외 동결).
+        UpdateHeatByPhase();
+
         // Progress에서만 이동한다(Idle/Start/Paused/End는 정지).
         if (trainPhase != TrainPhase.Progress) return;
 
@@ -228,6 +290,30 @@ public class TrainBehaviour : MonoBehaviour
         UpdateFollowers(false);
 
         OnTrainState?.Invoke(CurrentState);
+    }
+
+    // 페이즈별 공유 과열 처리. 중간 저장/정지 구간을 위해 비활성 페이즈에서는 누적하지 않는다.
+    // Progress: 진행 시간에 비례 상승 / Idle: 초기화 / Start·Paused·End: 동결.
+    private void UpdateHeatByPhase()
+    {
+        if (trainPhase == TrainPhase.Idle)
+        {
+            _heat = 0f;
+        }
+        else if (trainPhase == TrainPhase.Progress)
+        {
+            _heat = Mathf.Min(heatMax, _heat + heatRisePerSec * Time.fixedDeltaTime);
+        }
+        // Start / Paused / End: 동결(변경 없음).
+
+        // 임시: 냉각 가능 구간 진입/이탈 로그.
+        if (CanCool != _prevCanCool)
+        {
+            _prevCanCool = CanCool;
+            Debug.Log(CanCool
+                ? $"[Train] 냉각 가능 구간 진입 (heat={HeatRatio:P0})"
+                : $"[Train] 냉각 불가 구간 (heat={HeatRatio:P0})");
+        }
     }
 
     // 엔진을 Kinematic Rigidbody로 이동/회전시키고, 그 목표 Pose를 경로에 기록한다.
@@ -285,7 +371,46 @@ public class TrainBehaviour : MonoBehaviour
         int tileCount = railPath.TileCount;
         if (tileCount == 0) return;
 
-        _tileProgress += speed * Time.fixedDeltaTime;
+        // 레일이 종착점에 완전히 이어지면 빠르게 이동(대시). 1회만 적용.
+        // 현재 순항 속도에 배수를 곱해, 기준 속도가 얼마든 항상 눈에 띄게 가속한다.
+        if (!_goalDashApplied && railPath.IsConnectedToGoal)
+        {
+            speed *= goalDashMultiplier;
+            _goalDashApplied = true;
+            Debug.Log($"[Train] 종착 연결 → 대시 (speed={speed:F2})"); // 임시
+        }
+
+        // 종점 판정: 종착 연결 시 goal 타일 통과 지점, 아니면 놓인 레일 끝.
+        float endProgress = tileCount;
+        if (railPath.IsConnectedToGoal)
+        {
+            endProgress = Mathf.Min(endProgress, railPath.GoalTileIndex + 1);
+        }
+
+        // 목표 속도 결정 → 부드러운 가감속. 순항 속도 speed로 수렴하되,
+        // 정지 요청 또는 '종착(성공) 임박' 시 0으로 감속(정지 지점에 맞춰 브레이킹).
+        // 미연결 레일 끝은 감속하지 않는다(추후 실패 처리에서 사용).
+        float target = speed;
+        if (_stopRequested)
+        {
+            target = 0f;
+        }
+        else if (railPath.IsConnectedToGoal)
+        {
+            float remaining = endProgress - _tileProgress;
+            float brakingDist = (_currentSpeed * _currentSpeed) / (2f * Mathf.Max(accelRate, 0.0001f));
+            if (remaining <= brakingDist) target = 0f;
+        }
+        _currentSpeed = Mathf.MoveTowards(_currentSpeed, target, accelRate * Time.fixedDeltaTime);
+
+        // 수동 정지(Stop) 완료: 속도가 0에 수렴하면 종료.
+        if (_stopRequested && _currentSpeed <= 0.0001f)
+        {
+            SetPhase(TrainPhase.End);
+            return;
+        }
+
+        _tileProgress += _currentSpeed * Time.fixedDeltaTime;
 
         // 밟은 타일 영구 고정.
         int idx = Mathf.FloorToInt(_tileProgress);
@@ -295,14 +420,24 @@ public class TrainBehaviour : MonoBehaviour
             _lastTileIndex = idx;
         }
 
-        // 끝(마지막 타일의 진출점) 도달 → 정지.
-        if (_tileProgress >= tileCount)
+        if (_tileProgress >= endProgress)
         {
-            _tileProgress = tileCount;
+            _tileProgress = endProgress;
+            _currentSpeed = 0f;
             Pose endPose = railPath.Evaluate(_tileProgress);
             ApplyEnginePose(endPose);
             RecordEnginePose(endPose.position, endPose.rotation);
-            SetPhase(TrainPhase.End);
+
+            // 종착점 도착 → 클리어. 연결 없이 레일 끝(막다른 길) → 트랙 소진 실패.
+            if (railPath.IsConnectedToGoal)
+            {
+                OnStageClear?.Invoke();
+                SetPhase(TrainPhase.End);
+            }
+            else
+            {
+                Fail(FailReason.DeadEnd);
+            }
             return;
         }
 
@@ -420,7 +555,42 @@ public class TrainBehaviour : MonoBehaviour
     public void Stop()
     {
         if (trainPhase == TrainPhase.Idle || trainPhase == TrainPhase.End) return;
+
+        // 레일 주행 중이면 부드럽게 감속 후 정지(FixedUpdate에서 0 수렴 시 End).
+        if (railPath != null && trainPhase == TrainPhase.Progress)
+        {
+            _stopRequested = true;
+            return;
+        }
         SetPhase(TrainPhase.End);
+    }
+
+    // 스테이지 실패. 트랙 소진 또는 엔진 내구도 0에서 호출된다(중복 방지).
+    // 폭발은 공통, 급정차는 막다른 길(DeadEnd)에서만.
+    public void Fail(FailReason reason)
+    {
+        if (_failed || trainPhase == TrainPhase.End) return;
+        _failed = true;
+
+        SpawnExplosion(); // 폭발: 모든 실패 공통
+
+        if (reason == FailReason.DeadEnd)
+        {
+            _currentSpeed = 0f;   // 급정차: 막다른 길에서만 즉시 정지
+            _stopRequested = false;
+        }
+        // else EngineDestroyed: 운행 중 폭발 추가 연출은 고려중(TODO).
+
+        OnStageFail?.Invoke(reason); // 신호(사유 포함)
+        SetPhase(TrainPhase.End);
+    }
+
+    private void SpawnExplosion()
+    {
+        if (explosionPrefab == null) return;
+        Vector3 at = engineRoom != null ? engineRoom.position : transform.position;
+        Quaternion rot = engineRoom != null ? engineRoom.rotation : transform.rotation;
+        Instantiate(explosionPrefab, at, rot);
     }
 
     // 진행 중일 때만 일시정지.

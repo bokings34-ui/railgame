@@ -20,6 +20,10 @@ public class RailPath : MonoBehaviour
     [Tooltip("시작 블럭에서 처음 향할 직교 방향.")]
     [SerializeField] private GridDir startDir = GridDir.East;
 
+    [Header("종착점(스테이지 끝지점)")]
+    [Tooltip("이 블럭까지 레일이 완전히 이어지면 스테이지 종착으로 판정한다. 시작/종착 블럭은 자동 잠금(제거 불가).")]
+    [SerializeField] private RailBlock goalBlock;
+
     [Header("배치 프리팹(타입 구분 없는 단일 블럭)")]
     [SerializeField] private RailBlock blockPrefab;
 
@@ -35,14 +39,31 @@ public class RailPath : MonoBehaviour
     }
     private readonly List<Segment> _ordered = new List<Segment>();
 
+    // 순회 경로상 종착 블럭의 타일 인덱스(연결 안 되면 -1).
+    private int _goalTileIndex = -1;
+
     public float CellSize => cellSize;
     public float RailHeight => railHeight;
     public int TileCount => _ordered.Count;
+
+    public bool HasGoal => goalBlock != null;
+    public int GoalTileIndex => _goalTileIndex;
+
+    // 시작점에서 이어진 경로가 종착 블럭까지 완전히 연결됐는지.
+    public bool IsConnectedToGoal => _goalTileIndex >= 0;
 
     private void Awake()
     {
         RegisterExistingBlocks();
         BuildPath();
+        LockFixtures();
+    }
+
+    // 시작/종착 블럭은 스테이지 고정물 → 영구 잠금(탈착 불가).
+    private void LockFixtures()
+    {
+        if (startBlock != null) startBlock.Lock();
+        if (goalBlock != null) goalBlock.Lock();
     }
 
     // 자식으로 배치된 RailBlock들을 그리드에 등록한다.
@@ -53,6 +74,16 @@ public class RailPath : MonoBehaviour
         {
             _grid[WorldToCell(block.transform.position)] = block;
         }
+
+        // 시작/종착 블럭은 명시 참조이므로 자식이 아니어도 반드시 등록한다.
+        RegisterFixture(startBlock);
+        RegisterFixture(goalBlock);
+    }
+
+    private void RegisterFixture(RailBlock block)
+    {
+        if (block == null) return;
+        _grid[WorldToCell(block.transform.position)] = block;
     }
 
     public Vector2Int WorldToCell(Vector3 world)
@@ -72,6 +103,7 @@ public class RailPath : MonoBehaviour
     public void BuildPath()
     {
         _ordered.Clear();
+        _goalTileIndex = -1;
         if (startBlock == null) return;
 
         RailBlock current = startBlock;
@@ -84,6 +116,8 @@ public class RailPath : MonoBehaviour
             visited.Add(current);
             current.ApplyShape(entryPort, exitPort); // 연결로 타입 자동 결정
             _ordered.Add(new Segment { block = current, entryPort = entryPort, exitPort = exitPort });
+
+            if (current == goalBlock) _goalTileIndex = _ordered.Count - 1; // 종착 도달
 
             Vector2Int nextCell = WorldToCell(current.transform.position) + exitPort.ToOffset();
             if (!_grid.TryGetValue(nextCell, out RailBlock next)) break; // 진출 방향에 블럭 없음 → 종점

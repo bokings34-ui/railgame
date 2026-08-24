@@ -7,7 +7,7 @@ public enum SectionType
     WaterTank,
     Cargo,
     Production,
-
+    
 }
 
 // 열차 차량 1칸의 베이스. 파생 클래스가 타입별 역할과 기능을 부여한다.
