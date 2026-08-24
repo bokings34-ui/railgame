@@ -1,0 +1,9 @@
+{
+  "name": "Railgame.Hansol.ShoulderView",
+  "rootNamespace": "Railgame.Hansol.ShoulderView",
+  "references": [
+    "Unity.InputSystem",
+    "Unity.ugui"
+  ],
+  "autoReferenced": true
+}

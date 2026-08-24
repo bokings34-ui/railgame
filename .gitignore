@@ -51,6 +51,7 @@ ExportedObj/
 *.csproj
 *.unityproj
 *.sln
+*.slnx
 *.suo
 *.tmp
 *.user
@@ -62,6 +63,10 @@ ExportedObj/
 *.mdb
 *.opendb
 *.VC.db
+.vsconfig
+
+# Per-user Unity AI Assistant preferences
+/ProjectSettings/Packages/com.unity.ai.assistant/Settings.json
 
 # Unity3D generated meta files
 *.pidb.meta

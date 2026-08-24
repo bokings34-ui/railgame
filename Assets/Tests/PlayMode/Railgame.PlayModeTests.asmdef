@@ -1,0 +1,5 @@
+{
+  "name": "Railgame.PlayModeTests",
+  "references": ["Unity.InputSystem", "Unity.InputSystem.TestFramework"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}
