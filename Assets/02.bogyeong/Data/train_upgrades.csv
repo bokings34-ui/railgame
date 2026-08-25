@@ -1,0 +1,16 @@
+# 기차 업그레이드 데이터 테이블 (읽기 전용 소스)
+# 필수 컬럼: SectionType, Level  / 그 외 컬럼(Cost, Effect...)은 스탯으로 자유 확장
+# 레벨→비주얼 매핑은 CSV가 아니라 TrainVisualCatalog(SO)가 소유한다.
+SectionType,Level,Cost,Effect
+Engine,1,0,100
+Engine,2,150,140
+Engine,3,400,190
+WaterTank,1,0,50
+WaterTank,2,120,80
+WaterTank,3,320,120
+Cargo,1,0,10
+Cargo,2,100,20
+Cargo,3,260,35
+Production,1,0,5
+Production,2,90,12
+Production,3,240,25

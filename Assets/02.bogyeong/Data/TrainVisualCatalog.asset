@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4bb0d6b047159747b2f30f5d428c30e, type: 3}
+  m_Name: TrainVisualCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::TrainVisualCatalog
+  bindings:
+  - sectionType: 1
+    levels:
+    - level: 0
+      prefab: {fileID: 919132149155446097, guid: 1f07a0bb3b4e2704f91500cfa1a94ec1, type: 3}
+    - level: 0
+      prefab: {fileID: 919132149155446097, guid: af4c7e7f1c70dfd4ba92245b1d69d252, type: 3}
+    - level: 0
+      prefab: {fileID: 919132149155446097, guid: 204de7b2e688aca438347af73f2c03f5, type: 3}
+  - sectionType: 2
+    levels:
+    - level: 0
+      prefab: {fileID: 919132149155446097, guid: 76e459fb2ec019f429c1237fec57b522, type: 3}
+    - level: 1
+      prefab: {fileID: 919132149155446097, guid: 1833512cad81b8d46aff76024a6771d5, type: 3}
+  - sectionType: 3
+    levels:
+    - level: 0
+      prefab: {fileID: 919132149155446097, guid: 5b4343901df76a9479a4a7eb7b4f5462, type: 3}
+    - level: 0
+      prefab: {fileID: 919132149155446097, guid: fededfdc8c1b41b4fbc2eadf82174a4a, type: 3}
+  - sectionType: 4
+    levels:
+    - level: 0
+      prefab: {fileID: 919132149155446097, guid: 3876411b416a0984d8cce9bb1ec741c9, type: 3}
